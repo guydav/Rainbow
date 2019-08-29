@@ -6,6 +6,7 @@ from plotly.graph_objs import Scatter
 from plotly.graph_objs.scatter import Line
 import torch
 import wandb
+import numpy as np
 
 from env import Env
 
@@ -39,7 +40,7 @@ def test(args, T, dqn, val_mem, metrics, results_dir, evaluate=False):
   for state in val_mem:  # Iterate over valid states
     T_Qs.append(dqn.evaluate_q(state))
 
-  avg_reward, avg_Q = sum(T_rewards) / len(T_rewards), sum(T_Qs) / len(T_Qs)
+  avg_reward, avg_Q = np.mean(T_rewards), np.mean(T_Qs)
   if not evaluate:
     # Save model parameters if improved
     if avg_reward > metrics['best_avg_reward']:
@@ -56,7 +57,9 @@ def test(args, T, dqn, val_mem, metrics, results_dir, evaluate=False):
     _plot_line(metrics['steps'], metrics['Qs'], 'Q', path=results_dir)
 
     # Wandb log
-    wandb.log(dict(steps=T, rewards=T_rewards, Q_values=T_Qs, average_reward=avg_reward, average_Q_value=avg_Q))
+    wandb.log(dict(steps=T, rewards=T_rewards, Q_values=T_Qs,
+                   reward_mean=avg_reward, Q_value_mean=avg_Q,
+                   reward_std=np.std(T_rewards), Q_value_std=np.std(T_Qs)))
 
   # Return average reward and Q-value
   return avg_reward, avg_Q

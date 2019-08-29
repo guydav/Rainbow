@@ -66,13 +66,21 @@ results_dir = os.path.join('results', args.id)
 if not os.path.exists(results_dir):
   os.makedirs(results_dir)
 metrics = {'steps': [], 'rewards': [], 'Qs': [], 'best_avg_reward': -float('inf')}
+
+# Handle slurm array ids
+array_id = os.getenv('SLURM_ARRAY_TASK_ID')
+if array_id is not None:
+  args.seed = args.seed + int(array_id)
+
 np.random.seed(args.seed)
 # TODO: why not just fix the torch seed to the same one as np?
 # torch.manual_seed(np.random.randint(1, 10000))
 torch.manual_seed(args.seed)
+
 if torch.cuda.is_available() and not args.disable_cuda:
   args.device = torch.device('cuda')
-  torch.cuda.manual_seed(np.random.randint(1, 10000))
+  # torch.cuda.manual_seed(np.random.randint(1, 10000))
+  torch.cuda.manual_seed(args.seed)
   torch.backends.cudnn.enabled = args.enable_cudnn
 else:
   args.device = torch.device('cpu')
