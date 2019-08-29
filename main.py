@@ -6,6 +6,7 @@ from datetime import datetime
 import atari_py
 import numpy as np
 import torch
+import wandb
 
 from agent import Agent
 from env import Env
@@ -49,6 +50,12 @@ parser.add_argument('--evaluation-size', type=int, default=500, metavar='N', hel
 parser.add_argument('--render', action='store_true', help='Display screen (testing only)')
 parser.add_argument('--enable-cudnn', action='store_true', help='Enable cuDNN (faster but nondeterministic)')
 
+# Custom arguments I added
+DEFUALT_WANDB_ENTITY = 'augmented-frostbite'
+parser.add_argument('--wandb_entity', default=DEFUALT_WANDB_ENTITY)
+DEFAULT_WANDB_PROJECT = 'initial-experiments'
+parser.add_argument('--wandb_project', default=DEFAULT_WANDB_PROJECT)
+parser.add_argument('--wandb_omit_watch', default='store_true')
 
 # Setup
 args = parser.parse_args()
@@ -60,7 +67,9 @@ if not os.path.exists(results_dir):
   os.makedirs(results_dir)
 metrics = {'steps': [], 'rewards': [], 'Qs': [], 'best_avg_reward': -float('inf')}
 np.random.seed(args.seed)
-torch.manual_seed(np.random.randint(1, 10000))
+# TODO: why not just fix the torch seed to the same one as np?
+# torch.manual_seed(np.random.randint(1, 10000))
+torch.manual_seed(args.seed)
 if torch.cuda.is_available() and not args.disable_cuda:
   args.device = torch.device('cuda')
   torch.cuda.manual_seed(np.random.randint(1, 10000))
@@ -68,6 +77,10 @@ if torch.cuda.is_available() and not args.disable_cuda:
 else:
   args.device = torch.device('cpu')
 
+
+# Set up wandb
+wandb.init(entity=args.wandb_entity, project=args.wandb_project, name=f'{args.id}-{args.seed}',
+           config=vars(args))
 
 # Simple ISO 8601 timestamped logger
 def log(s):
@@ -84,6 +97,10 @@ action_space = env.action_space()
 dqn = Agent(args, env)
 mem = ReplayMemory(args, args.memory_capacity)
 priority_weight_increase = (1 - args.priority_weight) / (args.T_max - args.learn_start)
+
+if not args.wandb_omit_watch:
+  wandb.watch(dqn.online_net)
+  wandb.watch(dqn.target_net)
 
 
 # Construct validation memory

@@ -5,6 +5,7 @@ import plotly
 from plotly.graph_objs import Scatter
 from plotly.graph_objs.scatter import Line
 import torch
+import wandb
 
 from env import Env
 
@@ -53,6 +54,9 @@ def test(args, T, dqn, val_mem, metrics, results_dir, evaluate=False):
     # Plot
     _plot_line(metrics['steps'], metrics['rewards'], 'Reward', path=results_dir)
     _plot_line(metrics['steps'], metrics['Qs'], 'Q', path=results_dir)
+
+    # Wandb log
+    wandb.log(dict(steps=T, rewards=T_rewards, Q_values=T_Qs, average_reward=avg_reward, average_Q_value=avg_Q))
 
   # Return average reward and Q-value
   return avg_reward, avg_Q
