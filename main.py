@@ -13,6 +13,7 @@ from env import Env
 from memory import ReplayMemory
 from test import test
 from tqdm import tqdm
+import pickle
 
 
 # Note that hyperparameters may originally be reported in ATARI game frames instead of agent steps
@@ -110,7 +111,6 @@ if not args.wandb_omit_watch:
   wandb.watch(dqn.online_net)
   wandb.watch(dqn.target_net)
 
-
 # Construct validation memory
 val_mem = ReplayMemory(args, args.evaluation_size)
 T, done = 0, True
@@ -156,6 +156,15 @@ else:
         avg_reward, avg_Q = test(args, T, dqn, val_mem, metrics, results_dir)  # Test
         log('T = ' + str(T) + ' / ' + str(args.T_max) + ' | Avg. reward: ' + str(avg_reward) + ' | Avg. Q: ' + str(avg_Q))
         dqn.train()  # Set DQN (online network) back to training mode
+
+        with open(r'/misc/vlgscratch4/LakeGroup/guy/mem_test.pickle', 'wb') as pickle_file:
+          pickle.dump(mem, pickle_file)
+          print('Dumped memory to pickle')
+
+        f_size = os.path.getsize(r'/misc/vlgscratch4/LakeGroup/guy/mem_test.pickle')
+        print(f'File size is {f_size} bytes = {f_size / (1024 * 1024):.2f}MB, memory index is {mem.transitions.index}')
+
+        dqn.save(wandb.run.dir, f'{args.id}-{args.seed}-{T}.pth')
 
       # Update target network
       if T % args.target_update == 0:
