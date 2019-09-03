@@ -12,7 +12,7 @@ from agent import Agent
 from env import Env
 from memory import ReplayMemory
 from test import test
-from tqdm import tqdm
+from tqdm import tqdm, trange
 
 
 # Note that hyperparameters may originally be reported in ATARI game frames instead of agent steps
@@ -55,7 +55,8 @@ DEFUALT_WANDB_ENTITY = 'augmented-frostbite'
 parser.add_argument('--wandb_entity', default=DEFUALT_WANDB_ENTITY)
 DEFAULT_WANDB_PROJECT = 'initial-experiments'
 parser.add_argument('--wandb_project', default=DEFAULT_WANDB_PROJECT)
-parser.add_argument('--wandb_omit_watch', default='store_true')
+parser.add_argument('--wandb_omit_watch', action='store_true')
+parser.add_argument('--wandb-resume', action='store_true')
 
 # Setup
 args = parser.parse_args()
@@ -85,10 +86,50 @@ if torch.cuda.is_available() and not args.disable_cuda:
 else:
   args.device = torch.device('cpu')
 
-
 # Set up wandb
-wandb.init(entity=args.wandb_entity, project=args.wandb_project, name=f'{args.id}-{args.seed}',
+wandb_name = f'{args.id}-{args.seed}'
+
+if args.wandb_resume:
+  api = wandb.Api()
+
+  original_run_name = None
+  T_resume = None
+  resume_checkpoint = None
+
+  for existing_run in api.runs(f'{args.wandb_entity}/{args.wandb/project}'):
+    if existing_run.config['seed'] == args.seed:
+      original_run_name = existing_run.name
+
+      history = existing_run.history(pandas=True, samples=1000)
+      T_resume = history['steps'][-1]
+
+      try:
+        resume_checkpoint = existing_run.file(f'{wandb_name}-{resume_T}.pth')
+        resume_checkpoint.download(replace=True)
+
+      except (AttributeError, wandb.CommError) as e:
+        print('Failed to download most recent checkpoint, will not resume')
+
+      break
+
+  if original_run_name is None:
+    print(f'Failed to find run to resume for seed {args.seed}, running from scratch')
+
+  elif resume_checkpoint is None:
+    print(f'Failed to find checkpoint to resume for seed {args.seed}, running from scratch')
+
+  else:
+    os.environ['WANDB_RESUME'] = 'must'
+    os.environ['WANDB_RUN_ID'] = original_run_name
+
+    args.model = os.path.join('.', resume_checkpoint.name)
+
+
+wandb.init(entity=args.wandb_entity, project=args.wandb_project, name=wandb_name,
            config=vars(args))
+
+
+
 
 # Simple ISO 8601 timestamped logger
 def log(s):
@@ -108,12 +149,16 @@ priority_weight_increase = (1 - args.priority_weight) / (args.T_max - args.learn
 
 if not args.wandb_omit_watch:
   wandb.watch(dqn.online_net)
-  wandb.watch(dqn.target_net)
 
 
 # Construct validation memory
 val_mem = ReplayMemory(args, args.evaluation_size)
-T, done = 0, True
+
+T_start = 0
+if args.wandb_resume and T_resume is not None:
+  T_start = T_resume
+
+T, done = T_start, True
 while T < args.evaluation_size:
   if done:
     state, done = env.reset(), False
@@ -127,11 +172,12 @@ if args.evaluate:
   dqn.eval()  # Set DQN (online network) to evaluation mode
   avg_reward, avg_Q = test(args, 0, dqn, val_mem, metrics, results_dir, evaluate=True)  # Test
   print('Avg. reward: ' + str(avg_reward) + ' | Avg. Q: ' + str(avg_Q))
+
 else:
   # Training loop
   dqn.train()
-  T, done = 0, True
-  for T in tqdm(range(args.T_max)):
+  done = True
+  for T in trange(T_start, args.T_max):
     if done:
       state, done = env.reset(), False
 
@@ -156,6 +202,9 @@ else:
         avg_reward, avg_Q = test(args, T, dqn, val_mem, metrics, results_dir)  # Test
         log('T = ' + str(T) + ' / ' + str(args.T_max) + ' | Avg. reward: ' + str(avg_reward) + ' | Avg. Q: ' + str(avg_Q))
         dqn.train()  # Set DQN (online network) back to training mode
+
+        # Save after every evaluation
+        dqn.save(wandb.run.dir, f'{wandb_name}-{T}.pth')
 
       # Update target network
       if T % args.target_update == 0:
