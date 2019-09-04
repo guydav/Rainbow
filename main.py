@@ -13,6 +13,7 @@ from env import Env
 from memory import ReplayMemory
 from test import test
 from tqdm import tqdm, trange
+import pickle
 
 
 # Note that hyperparameters may originally be reported in ATARI game frames instead of agent steps
@@ -52,11 +53,13 @@ parser.add_argument('--enable-cudnn', action='store_true', help='Enable cuDNN (f
 
 # Custom arguments I added
 DEFUALT_WANDB_ENTITY = 'augmented-frostbite'
-parser.add_argument('--wandb_entity', default=DEFUALT_WANDB_ENTITY)
+parser.add_argument('--wandb-entity', default=DEFUALT_WANDB_ENTITY)
 DEFAULT_WANDB_PROJECT = 'initial-experiments'
-parser.add_argument('--wandb_project', default=DEFAULT_WANDB_PROJECT)
-parser.add_argument('--wandb_omit_watch', action='store_true')
+parser.add_argument('--wandb-project', default=DEFAULT_WANDB_PROJECT)
+parser.add_argument('--wandb-omit-watch', action='store_true')
 parser.add_argument('--wandb-resume', action='store_true')
+DEFAULT_MEMORY_SAVE_FOLDER = r'/misc/vlgscratch4/LakeGroup/guy/'
+parser.add_argument('--memory-save-folder', default=DEFAULT_MEMORY_SAVE_FOLDER)
 
 # Setup
 args = parser.parse_args()
@@ -86,6 +89,17 @@ if torch.cuda.is_available() and not args.disable_cuda:
 else:
   args.device = torch.device('cpu')
 
+memory_save_folder = os.path.join(args.memory_save_folder, args.id)
+os.makedirs(memory_save_folder, exist_ok=True)
+
+replay_memory_pickle = f'{args.seed}-replay-memory.pickle'
+replay_memory_T_reached = f'{args.seed}-T-reached.txt'
+
+
+def get_memory_file_path(name, folder=memory_save_folder):
+  return os.path.join(folder, name)
+
+
 # Set up wandb
 wandb_name = f'{args.id}-{args.seed}'
 
@@ -95,6 +109,7 @@ if args.wandb_resume:
   original_run_name = None
   T_resume = None
   resume_checkpoint = None
+  loaded_replay_memory = None
 
   for existing_run in api.runs(f'{args.wandb_entity}/{args.wandb/project}'):
     if existing_run.config['seed'] == args.seed:
@@ -110,6 +125,18 @@ if args.wandb_resume:
       except (AttributeError, wandb.CommError) as e:
         print('Failed to download most recent checkpoint, will not resume')
 
+      if not os.path.exists(get_memory_file_path(replay_memory_T_reached)):
+        print('Couldn\'t find replay memory T reached file...')
+
+      with open(get_memory_file_path(replay_memory_T_reached), 'r') as T_file:
+        mem_T_reached = int(T_file.read())
+
+      if mem_T_reached != T_resume:
+        print(f'Timestep mismatch: wandb has {T_resume}, while memory file has {mem_T_reached}...')
+
+      with open(get_memory_file_path(replay_memory_pickle), 'rb') as pickle_file:
+        loaded_replay_memory = pickle.load(pickle_file)
+
       break
 
   if original_run_name is None:
@@ -117,6 +144,9 @@ if args.wandb_resume:
 
   elif resume_checkpoint is None:
     print(f'Failed to find checkpoint to resume for seed {args.seed}, running from scratch')
+
+  elif loaded_replay_memory is None:
+    print('Failed to load replay memory, running from scratch')
 
   else:
     os.environ['WANDB_RESUME'] = 'must'
@@ -150,13 +180,13 @@ priority_weight_increase = (1 - args.priority_weight) / (args.T_max - args.learn
 if not args.wandb_omit_watch:
   wandb.watch(dqn.online_net)
 
-
 # Construct validation memory
 val_mem = ReplayMemory(args, args.evaluation_size)
 
 T_start = 0
 if args.wandb_resume and T_resume is not None:
   T_start = T_resume
+  mem = loaded_replay_memory
 
 T, done = T_start, True
 while T < args.evaluation_size:
@@ -203,8 +233,16 @@ else:
         log('T = ' + str(T) + ' / ' + str(args.T_max) + ' | Avg. reward: ' + str(avg_reward) + ' | Avg. Q: ' + str(avg_Q))
         dqn.train()  # Set DQN (online network) back to training mode
 
-        # Save after every evaluation
         dqn.save(wandb.run.dir, f'{wandb_name}-{T}.pth')
+
+        memory_save_folder = os.path.join(args.memory_save_folder, args.id)
+        os.makedirs(memory_save_folder, exist_ok=True)
+
+        with open(get_memory_file_path(replay_memory_pickle), 'wb') as pickle_file:
+          pickle.dump(mem, pickle_file)
+
+        with open(get_memory_file_path(replay_memory_T_reached), 'w') as T_file:
+          T_file.write(str(T))
 
       # Update target network
       if T % args.target_update == 0:
