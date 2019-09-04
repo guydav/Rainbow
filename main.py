@@ -12,7 +12,7 @@ from agent import Agent
 from env import Env
 from memory import ReplayMemory
 from test import test
-from tqdm import tqdm
+from tqdm import tqdm, trange
 import pickle
 
 
@@ -53,10 +53,13 @@ parser.add_argument('--enable-cudnn', action='store_true', help='Enable cuDNN (f
 
 # Custom arguments I added
 DEFUALT_WANDB_ENTITY = 'augmented-frostbite'
-parser.add_argument('--wandb_entity', default=DEFUALT_WANDB_ENTITY)
+parser.add_argument('--wandb-entity', default=DEFUALT_WANDB_ENTITY)
 DEFAULT_WANDB_PROJECT = 'initial-experiments'
-parser.add_argument('--wandb_project', default=DEFAULT_WANDB_PROJECT)
-parser.add_argument('--wandb_omit_watch', default='store_true')
+parser.add_argument('--wandb-project', default=DEFAULT_WANDB_PROJECT)
+parser.add_argument('--wandb-omit-watch', action='store_true')
+parser.add_argument('--wandb-resume', action='store_true')
+DEFAULT_MEMORY_SAVE_FOLDER = r'/misc/vlgscratch4/LakeGroup/guy/'
+parser.add_argument('--memory-save-folder', default=DEFAULT_MEMORY_SAVE_FOLDER)
 
 # Setup
 args = parser.parse_args()
@@ -86,10 +89,77 @@ if torch.cuda.is_available() and not args.disable_cuda:
 else:
   args.device = torch.device('cpu')
 
+memory_save_folder = os.path.join(args.memory_save_folder, args.id)
+os.makedirs(memory_save_folder, exist_ok=True)
+
+replay_memory_pickle = f'{args.seed}-replay-memory.pickle'
+replay_memory_T_reached = f'{args.seed}-T-reached.txt'
+
+
+def get_memory_file_path(name, folder=memory_save_folder):
+  return os.path.join(folder, name)
+
 
 # Set up wandb
-wandb.init(entity=args.wandb_entity, project=args.wandb_project, name=f'{args.id}-{args.seed}',
+wandb_name = f'{args.id}-{args.seed}'
+
+if args.wandb_resume:
+  api = wandb.Api()
+
+  original_run_name = None
+  T_resume = None
+  resume_checkpoint = None
+  loaded_replay_memory = None
+
+  for existing_run in api.runs(f'{args.wandb_entity}/{args.wandb/project}'):
+    if existing_run.config['seed'] == args.seed:
+      original_run_name = existing_run.name
+
+      history = existing_run.history(pandas=True, samples=1000)
+      T_resume = history['steps'][-1]
+
+      try:
+        resume_checkpoint = existing_run.file(f'{wandb_name}-{resume_T}.pth')
+        resume_checkpoint.download(replace=True)
+
+      except (AttributeError, wandb.CommError) as e:
+        print('Failed to download most recent checkpoint, will not resume')
+
+      if not os.path.exists(get_memory_file_path(replay_memory_T_reached)):
+        print('Couldn\'t find replay memory T reached file...')
+
+      with open(get_memory_file_path(replay_memory_T_reached), 'r') as T_file:
+        mem_T_reached = int(T_file.read())
+
+      if mem_T_reached != T_resume:
+        print(f'Timestep mismatch: wandb has {T_resume}, while memory file has {mem_T_reached}...')
+
+      with open(get_memory_file_path(replay_memory_pickle), 'rb') as pickle_file:
+        loaded_replay_memory = pickle.load(pickle_file)
+
+      break
+
+  if original_run_name is None:
+    print(f'Failed to find run to resume for seed {args.seed}, running from scratch')
+
+  elif resume_checkpoint is None:
+    print(f'Failed to find checkpoint to resume for seed {args.seed}, running from scratch')
+
+  elif loaded_replay_memory is None:
+    print('Failed to load replay memory, running from scratch')
+
+  else:
+    os.environ['WANDB_RESUME'] = 'must'
+    os.environ['WANDB_RUN_ID'] = original_run_name
+
+    args.model = os.path.join('.', resume_checkpoint.name)
+
+
+wandb.init(entity=args.wandb_entity, project=args.wandb_project, name=wandb_name,
            config=vars(args))
+
+
+
 
 # Simple ISO 8601 timestamped logger
 def log(s):
@@ -109,11 +179,16 @@ priority_weight_increase = (1 - args.priority_weight) / (args.T_max - args.learn
 
 if not args.wandb_omit_watch:
   wandb.watch(dqn.online_net)
-  wandb.watch(dqn.target_net)
 
 # Construct validation memory
 val_mem = ReplayMemory(args, args.evaluation_size)
-T, done = 0, True
+
+T_start = 0
+if args.wandb_resume and T_resume is not None:
+  T_start = T_resume
+  mem = loaded_replay_memory
+
+T, done = T_start, True
 while T < args.evaluation_size:
   if done:
     state, done = env.reset(), False
@@ -127,11 +202,12 @@ if args.evaluate:
   dqn.eval()  # Set DQN (online network) to evaluation mode
   avg_reward, avg_Q = test(args, 0, dqn, val_mem, metrics, results_dir, evaluate=True)  # Test
   print('Avg. reward: ' + str(avg_reward) + ' | Avg. Q: ' + str(avg_Q))
+
 else:
   # Training loop
   dqn.train()
-  T, done = 0, True
-  for T in tqdm(range(args.T_max)):
+  done = True
+  for T in trange(T_start, args.T_max):
     if done:
       state, done = env.reset(), False
 
@@ -157,14 +233,16 @@ else:
         log('T = ' + str(T) + ' / ' + str(args.T_max) + ' | Avg. reward: ' + str(avg_reward) + ' | Avg. Q: ' + str(avg_Q))
         dqn.train()  # Set DQN (online network) back to training mode
 
-        with open(r'/misc/vlgscratch4/LakeGroup/guy/mem_test.pickle', 'wb') as pickle_file:
+        dqn.save(wandb.run.dir, f'{wandb_name}-{T}.pth')
+
+        memory_save_folder = os.path.join(args.memory_save_folder, args.id)
+        os.makedirs(memory_save_folder, exist_ok=True)
+
+        with open(get_memory_file_path(replay_memory_pickle), 'wb') as pickle_file:
           pickle.dump(mem, pickle_file)
-          print('Dumped memory to pickle')
 
-        f_size = os.path.getsize(r'/misc/vlgscratch4/LakeGroup/guy/mem_test.pickle')
-        print(f'File size is {f_size} bytes = {f_size / (1024 * 1024):.2f}MB, memory index is {mem.transitions.index}')
-
-        dqn.save(wandb.run.dir, f'{args.id}-{args.seed}-{T}.pth')
+        with open(get_memory_file_path(replay_memory_T_reached), 'w') as T_file:
+          T_file.write(str(T))
 
       # Update target network
       if T % args.target_update == 0:
