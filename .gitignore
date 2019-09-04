@@ -93,3 +93,6 @@ ENV/
 *.pth
 # Plots
 *.html
+
+# Weights and Biases
+wandb/
