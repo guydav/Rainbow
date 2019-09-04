@@ -106,20 +106,20 @@ wandb_name = f'{args.id}-{args.seed}'
 if args.wandb_resume:
   api = wandb.Api()
 
-  original_run_name = None
+  original_run_id = None
   T_resume = None
   resume_checkpoint = None
   loaded_replay_memory = None
 
-  for existing_run in api.runs(f'{args.wandb_entity}/{args.wandb/project}'):
+  for existing_run in api.runs(f'{args.wandb_entity}/{args.wandb_project}'):
     if existing_run.config['seed'] == args.seed:
-      original_run_name = existing_run.name
+      original_run_id = existing_run.id
 
       history = existing_run.history(pandas=True, samples=1000)
-      T_resume = history['steps'][-1]
+      T_resume = int(history['steps'].iat[-1])
 
       try:
-        resume_checkpoint = existing_run.file(f'{wandb_name}-{resume_T}.pth')
+        resume_checkpoint = existing_run.file(f'{wandb_name}-{T_resume}.pth')
         resume_checkpoint.download(replace=True)
 
       except (AttributeError, wandb.CommError) as e:
@@ -139,7 +139,7 @@ if args.wandb_resume:
 
       break
 
-  if original_run_name is None:
+  if original_run_id is None:
     print(f'Failed to find run to resume for seed {args.seed}, running from scratch')
 
   elif resume_checkpoint is None:
@@ -150,10 +150,13 @@ if args.wandb_resume:
 
   else:
     os.environ['WANDB_RESUME'] = 'must'
-    os.environ['WANDB_RUN_ID'] = original_run_name
+    os.environ['WANDB_RUN_ID'] = original_run_id
 
-    args.model = os.path.join('.', resume_checkpoint.name)
+    args.model = resume_checkpoint.name
 
+for key in os.environ:
+  if 'WANDB' in key:
+    print(key, os.environ[key])
 
 wandb.init(entity=args.wandb_entity, project=args.wandb_project, name=wandb_name,
            config=vars(args))
@@ -182,21 +185,19 @@ if not args.wandb_omit_watch:
 
 # Construct validation memory
 val_mem = ReplayMemory(args, args.evaluation_size)
-
-T_start = 0
-if args.wandb_resume and T_resume is not None:
-  T_start = T_resume
-  mem = loaded_replay_memory
-
-T, done = T_start, True
-while T < args.evaluation_size:
+done = True
+for _ in range(args.evaluation_size):
   if done:
     state, done = env.reset(), False
 
   next_state, _, done = env.step(np.random.randint(0, action_space))
   val_mem.append(state, None, None, done)
   state = next_state
-  T += 1
+
+T_start = 0
+if args.wandb_resume and T_resume is not None:
+  T_start = T_resume
+  mem = loaded_replay_memory
 
 if args.evaluate:
   dqn.eval()  # Set DQN (online network) to evaluation mode
@@ -207,7 +208,7 @@ else:
   # Training loop
   dqn.train()
   done = True
-  for T in trange(T_start, args.T_max):
+  for T in trange(T_start + 1, args.T_max + 1):
     if done:
       state, done = env.reset(), False
 
