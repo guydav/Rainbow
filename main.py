@@ -59,7 +59,7 @@ DEFUALT_WANDB_ENTITY = 'augmented-frostbite'
 parser.add_argument('--wandb-entity', default=DEFUALT_WANDB_ENTITY)
 DEFAULT_WANDB_PROJECT = 'initial-experiments'
 parser.add_argument('--wandb-project', default=DEFAULT_WANDB_PROJECT)
-DEFAULT_WANDB_DIR = os.path.join(SCRATCH_FOLDER, 'wandb')
+DEFAULT_WANDB_DIR = SCRATCH_FOLDER  # wandb creates its own folder inside
 parser.add_argument('--wandb-dir', default=DEFAULT_WANDB_DIR)
 parser.add_argument('--wandb-omit-watch', action='store_true')
 parser.add_argument('--wandb-resume', action='store_true')
@@ -165,6 +165,7 @@ for key in os.environ:
 
 wandb.init(entity=args.wandb_entity, project=args.wandb_project, name=wandb_name,
            dir=args.wandb_dir, config=vars(args))
+wandb.save(os.path.join(wandb.run.dir, '*.pth'))
 
 
 # Simple ISO 8601 timestamped logger
