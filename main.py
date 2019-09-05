@@ -52,13 +52,18 @@ parser.add_argument('--render', action='store_true', help='Display screen (testi
 parser.add_argument('--enable-cudnn', action='store_true', help='Enable cuDNN (faster but nondeterministic)')
 
 # Custom arguments I added
+
+SCRATCH_FOLDER = r'/misc/vlgscratch4/LakeGroup/guy/'
+
 DEFUALT_WANDB_ENTITY = 'augmented-frostbite'
 parser.add_argument('--wandb-entity', default=DEFUALT_WANDB_ENTITY)
 DEFAULT_WANDB_PROJECT = 'initial-experiments'
 parser.add_argument('--wandb-project', default=DEFAULT_WANDB_PROJECT)
+DEFAULT_WANDB_DIR = os.path.join(SCRATCH_FOLDER, 'wandb')
+parser.add_argument('--wandb-dir', default=DEFAULT_WANDB_DIR)
 parser.add_argument('--wandb-omit-watch', action='store_true')
 parser.add_argument('--wandb-resume', action='store_true')
-DEFAULT_MEMORY_SAVE_FOLDER = r'/misc/vlgscratch4/LakeGroup/guy/'
+DEFAULT_MEMORY_SAVE_FOLDER = os.path.join(SCRATCH_FOLDER, 'rainbow_memory')
 parser.add_argument('--memory-save-folder', default=DEFAULT_MEMORY_SAVE_FOLDER)
 
 # Setup
@@ -159,9 +164,7 @@ for key in os.environ:
     print(key, os.environ[key])
 
 wandb.init(entity=args.wandb_entity, project=args.wandb_project, name=wandb_name,
-           config=vars(args))
-
-
+           dir=args.wandb_dir, config=vars(args))
 
 
 # Simple ISO 8601 timestamped logger
