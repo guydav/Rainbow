@@ -133,8 +133,10 @@ def save_memory(memory, T_reached):
 # Set up wandb
 wandb_name = f'{args.id}-{args.seed}'
 
-del os.environ['WANDB_RESUME']
-del os.environ['WANDB_RUN_ID']
+for wandb_key in ('WANDB_RESUME', 'WANDB_RUN_ID'):
+  if wandb_key in os.environ:
+    del os.environ[wandb_key]
+
 
 if args.wandb_resume:
   api = wandb.Api()
