@@ -14,6 +14,7 @@ from memory import ReplayMemory
 from test import test
 from tqdm import tqdm, trange
 import pickle
+import bz2
 
 
 # Note that hyperparameters may originally be reported in ATARI game frames instead of agent steps
@@ -66,6 +67,7 @@ parser.add_argument('--wandb-resume', action='store_true')
 DEFAULT_MEMORY_SAVE_FOLDER = os.path.join(SCRATCH_FOLDER, 'rainbow_memory')
 parser.add_argument('--memory-save-folder', default=DEFAULT_MEMORY_SAVE_FOLDER)
 
+
 # Setup
 args = parser.parse_args()
 print(' ' * 26 + 'Options')
@@ -98,6 +100,7 @@ memory_save_folder = os.path.join(args.memory_save_folder, args.id)
 os.makedirs(memory_save_folder, exist_ok=True)
 
 replay_memory_pickle = f'{args.seed}-replay-memory.pickle'
+replay_memory_pickle_bz2 = f'{args.seed}-replay-memory.pickle.bz2'
 replay_memory_T_reached = f'{args.seed}-T-reached.txt'
 
 
@@ -105,8 +108,33 @@ def get_memory_file_path(name, folder=memory_save_folder):
   return os.path.join(folder, name)
 
 
+def load_memory(bz2=True):
+  global replay_memory_pickle_bz2, replay_memory_pickle
+
+  if bz2:
+    with bz2.open(get_memory_file_path(replay_memory_pickle_bz2), 'rb') as zipped_pickle_file:
+      return pickle.load(zipped_pickle_file)
+
+  else:
+    with open(get_memory_file_path(replay_memory_pickle), 'rb') as regular_pickle_file:
+      return pickle.load(regular_pickle_file)
+
+
+def save_memory(memory, T_reached):
+  global replay_memory_pickle_bz2, replay_memory_T_reached
+
+  with bz2.open(get_memory_file_path(replay_memory_pickle_bz2), 'wb') as zipped_pickle_file:
+    pickle.dump(memory, zipped_pickle_file)
+
+  with open(get_memory_file_path(replay_memory_T_reached), 'w') as memory_T_file:
+    memory_T_file.write(str(T_reached))
+
+
 # Set up wandb
 wandb_name = f'{args.id}-{args.seed}'
+
+del os.environ['WANDB_RESUME']
+del os.environ['WANDB_RUN_ID']
 
 if args.wandb_resume:
   api = wandb.Api()
@@ -139,8 +167,15 @@ if args.wandb_resume:
       if mem_T_reached != T_resume:
         print(f'Timestep mismatch: wandb has {T_resume}, while memory file has {mem_T_reached}...')
 
-      with open(get_memory_file_path(replay_memory_pickle), 'rb') as pickle_file:
-        loaded_replay_memory = pickle.load(pickle_file)
+      # temporary condition to handle the non-zipped, old pickle files
+
+      if os.path.exists(get_memory_file_path(replay_memory_pickle)):
+        loaded_replay_memory = load_memory(bz2=False)
+        save_memory(loaded_replay_memory, mem_T_reached)
+        os.remove(get_memory_file_path(replay_memory_pickle))
+
+      else:
+        loaded_replay_memory = load_memory()
 
       break
 
@@ -203,6 +238,7 @@ if args.wandb_resume and T_resume is not None:
   T_start = T_resume
   mem = loaded_replay_memory
 
+
 if args.evaluate:
   dqn.eval()  # Set DQN (online network) to evaluation mode
   avg_reward, avg_Q = test(args, 0, dqn, val_mem, metrics, results_dir, evaluate=True)  # Test
@@ -243,11 +279,7 @@ else:
         memory_save_folder = os.path.join(args.memory_save_folder, args.id)
         os.makedirs(memory_save_folder, exist_ok=True)
 
-        with open(get_memory_file_path(replay_memory_pickle), 'wb') as pickle_file:
-          pickle.dump(mem, pickle_file)
-
-        with open(get_memory_file_path(replay_memory_T_reached), 'w') as T_file:
-          T_file.write(str(T))
+        save_memory(mem, T)
 
       # Update target network
       if T % args.target_update == 0:

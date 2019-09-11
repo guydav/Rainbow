@@ -57,7 +57,9 @@ def test(args, T, dqn, val_mem, metrics, results_dir, evaluate=False):
     _plot_line(metrics['steps'], metrics['Qs'], 'Q', path=results_dir)
 
     # Wandb log
-    wandb.log(dict(steps=T, rewards=T_rewards, Q_values=T_Qs,
+    # human hours = steps * (4 frames / step) * (1/60 s / frame) * (1/60 minutes /s ) * (1/60 hours / minute)
+    wandb.log(dict(steps=T, human_hours=T * 4 / (60 * 60 * 60),
+                   rewards=T_rewards, Q_values=T_Qs,
                    reward_mean=avg_reward, Q_value_mean=avg_Q,
                    reward_std=np.std(T_rewards), Q_value_std=np.std(T_Qs)))
 
