@@ -146,40 +146,44 @@ if args.wandb_resume:
   resume_checkpoint = None
   loaded_replay_memory = None
 
-  for existing_run in api.runs(f'{args.wandb_entity}/{args.wandb_project}'):
-    if existing_run.config['seed'] == args.seed:
-      original_run_id = existing_run.id
+  existing_runs = api.runs(f'{args.wandb_entity}/{args.wandb_project}', {'$and': [{'config.id': str(args.id)},
+                                                                                  {'config.seed': int(args.seed)}]})
 
-      history = existing_run.history(pandas=True, samples=1000)
-      T_resume = int(history['steps'].iat[-1])
+  if len(existing_runs) > 1:
+    raise ValueError(f'Found more than one matching run to id {args.id} and seed {args.seed}: {[r.id for r in existing_runs]}. Aborting... ')
 
-      try:
-        resume_checkpoint = existing_run.file(f'{wandb_name}-{T_resume}.pth')
-        resume_checkpoint.download(replace=True)
+  elif len(existing_runs) == 1:
+    existing_run = existing_runs[0]
+    original_run_id = existing_run.id
 
-      except (AttributeError, wandb.CommError) as e:
-        print('Failed to download most recent checkpoint, will not resume')
+    history = existing_run.history(pandas=True, samples=1000)
+    T_resume = int(history['steps'].iat[-1])
 
-      if not os.path.exists(get_memory_file_path(replay_memory_T_reached)):
-        print('Couldn\'t find replay memory T reached file...')
+    try:
+      resume_checkpoint = existing_run.file(f'{wandb_name}-{T_resume}.pth')
+      resume_checkpoint.download(replace=True)
 
-      with open(get_memory_file_path(replay_memory_T_reached), 'r') as T_file:
-        mem_T_reached = int(T_file.read())
+    except (AttributeError, wandb.CommError) as e:
+      print('Failed to download most recent checkpoint, will not resume')
 
-      if mem_T_reached != T_resume:
-        print(f'Timestep mismatch: wandb has {T_resume}, while memory file has {mem_T_reached}...')
+    if not os.path.exists(get_memory_file_path(replay_memory_T_reached)):
+      print('Couldn\'t find replay memory T reached file...')
 
-      # temporary condition to handle the non-zipped, old pickle files
+    with open(get_memory_file_path(replay_memory_T_reached), 'r') as T_file:
+      mem_T_reached = int(T_file.read())
 
-      if os.path.exists(get_memory_file_path(replay_memory_pickle)):
-        loaded_replay_memory = load_memory(bz2=False)
-        save_memory(loaded_replay_memory, mem_T_reached)
-        os.remove(get_memory_file_path(replay_memory_pickle))
+    if mem_T_reached != T_resume:
+      print(f'Timestep mismatch: wandb has {T_resume}, while memory file has {mem_T_reached}...')
 
-      else:
-        loaded_replay_memory = load_memory()
+    # temporary condition to handle the non-zipped, old pickle files
 
-      break
+    if os.path.exists(get_memory_file_path(replay_memory_pickle)):
+      loaded_replay_memory = load_memory(bz2=False)
+      save_memory(loaded_replay_memory, mem_T_reached)
+      os.remove(get_memory_file_path(replay_memory_pickle))
+
+    else:
+      loaded_replay_memory = load_memory()
 
   if original_run_id is None:
     print(f'Failed to find run to resume for seed {args.seed}, running from scratch')
