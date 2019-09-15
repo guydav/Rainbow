@@ -1,20 +1,23 @@
 # -*- coding: utf-8 -*-
 from __future__ import division
 import argparse
-import os
+import bz2
 from datetime import datetime
+import os
+import pickle
+import shutil
+
 import atari_py
 import numpy as np
 import torch
+from tqdm import tqdm, trange
 import wandb
 
 from agent import Agent
 from env import Env
 from memory import ReplayMemory
 from test import test
-from tqdm import tqdm, trange
-import pickle
-import bz2
+
 
 
 # Note that hyperparameters may originally be reported in ATARI game frames instead of agent steps
@@ -101,6 +104,7 @@ os.makedirs(memory_save_folder, exist_ok=True)
 
 replay_memory_pickle = f'{args.seed}-replay-memory.pickle'
 replay_memory_pickle_bz2 = f'{args.seed}-replay-memory.pickle.bz2'
+replay_memory_pickle_bz2_temp = f'{args.seed}-replay-memory.pickle.bz2.temp'
 replay_memory_T_reached = f'{args.seed}-T-reached.txt'
 
 
@@ -121,10 +125,13 @@ def load_memory(use_bz2=True):
 
 
 def save_memory(memory, T_reached):
-  global replay_memory_pickle_bz2, replay_memory_T_reached
+  global replay_memory_pickle_bz2, replay_memory_pickle_bz2_temp, replay_memory_T_reached
 
-  with bz2.open(get_memory_file_path(replay_memory_pickle_bz2), 'wb') as zipped_pickle_file:
+  with bz2.open(get_memory_file_path(replay_memory_pickle_bz2_temp), 'wb') as zipped_pickle_file:
     pickle.dump(memory, zipped_pickle_file)
+
+  # Switch to copying and moving separately to mitigate the effect of instane shutdown while writing
+  shutil.move(replay_memory_pickle_bz2_temp, replay_memory_pickle_bz2)
 
   with open(get_memory_file_path(replay_memory_T_reached), 'w') as memory_T_file:
     memory_T_file.write(str(T_reached))
