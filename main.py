@@ -157,7 +157,31 @@ if args.wandb_resume:
     original_run_id = existing_run.id
 
     history = existing_run.history(pandas=True, samples=1000)
-    T_resume = int(history['steps'].iat[-1])
+    T_checkpoint = int(history['steps'].iat[-1])
+
+    if not os.path.exists(get_memory_file_path(replay_memory_T_reached)):
+      print('Couldn\'t find replay memory T reached file...')
+
+    with open(get_memory_file_path(replay_memory_T_reached), 'r') as T_file:
+      T_memory = int(T_file.read())
+
+    # Take the min to resume from the earlier of the two potential points
+    T_resume = min(T_checkpoint, T_memory)
+
+    if T_memory != T_checkpoint:
+      print(f'Timestep mismatch: wandb has {T_checkpoint}, while memory file has {T_memory}. Going with {T_resume}...')
+
+    # temporary condition to handle the non-zipped, old pickle files
+
+    if os.path.exists(get_memory_file_path(replay_memory_pickle)):
+      loaded_replay_memory = load_memory(bz2=False)
+      save_memory(loaded_replay_memory, T_memory)
+      os.remove(get_memory_file_path(replay_memory_pickle))
+
+    else:
+      loaded_replay_memory = load_memory()
+
+    # Now that we now that T_resume is, we can load from there.
 
     try:
       resume_checkpoint = existing_run.file(f'{wandb_name}-{T_resume}.pth')
@@ -166,24 +190,6 @@ if args.wandb_resume:
     except (AttributeError, wandb.CommError) as e:
       print('Failed to download most recent checkpoint, will not resume')
 
-    if not os.path.exists(get_memory_file_path(replay_memory_T_reached)):
-      print('Couldn\'t find replay memory T reached file...')
-
-    with open(get_memory_file_path(replay_memory_T_reached), 'r') as T_file:
-      mem_T_reached = int(T_file.read())
-
-    if mem_T_reached != T_resume:
-      print(f'Timestep mismatch: wandb has {T_resume}, while memory file has {mem_T_reached}...')
-
-    # temporary condition to handle the non-zipped, old pickle files
-
-    if os.path.exists(get_memory_file_path(replay_memory_pickle)):
-      loaded_replay_memory = load_memory(bz2=False)
-      save_memory(loaded_replay_memory, mem_T_reached)
-      os.remove(get_memory_file_path(replay_memory_pickle))
-
-    else:
-      loaded_replay_memory = load_memory()
 
   if original_run_id is None:
     print(f'Failed to find run to resume for seed {args.seed}, running from scratch')
