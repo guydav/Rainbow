@@ -108,10 +108,10 @@ def get_memory_file_path(name, folder=memory_save_folder):
   return os.path.join(folder, name)
 
 
-def load_memory(bz2=True):
+def load_memory(use_bz2=True):
   global replay_memory_pickle_bz2, replay_memory_pickle
 
-  if bz2:
+  if use_bz2:
     with bz2.open(get_memory_file_path(replay_memory_pickle_bz2), 'rb') as zipped_pickle_file:
       return pickle.load(zipped_pickle_file)
 
@@ -174,7 +174,7 @@ if args.wandb_resume:
     # temporary condition to handle the non-zipped, old pickle files
 
     if os.path.exists(get_memory_file_path(replay_memory_pickle)):
-      loaded_replay_memory = load_memory(bz2=False)
+      loaded_replay_memory = load_memory(use_bz2=False)
       save_memory(loaded_replay_memory, T_memory)
       os.remove(get_memory_file_path(replay_memory_pickle))
 
