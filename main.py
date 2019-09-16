@@ -131,7 +131,7 @@ def save_memory(memory, T_reached):
     pickle.dump(memory, zipped_pickle_file)
 
   # Switch to copying and moving separately to mitigate the effect of instane shutdown while writing
-  shutil.move(replay_memory_pickle_bz2_temp, replay_memory_pickle_bz2)
+  shutil.move(get_memory_file_path(replay_memory_pickle_bz2_temp), get_memory_file_path(replay_memory_pickle_bz2))
 
   with open(get_memory_file_path(replay_memory_T_reached), 'w') as memory_T_file:
     memory_T_file.write(str(T_reached))
