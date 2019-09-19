@@ -6,6 +6,7 @@ from datetime import datetime
 import os
 import pickle
 import shutil
+import time
 
 import atari_py
 import numpy as np
@@ -108,10 +109,23 @@ replay_memory_pickle_bz2_temp = f'{args.seed}-replay-memory.pickle.bz2.temp'
 replay_memory_T_reached = f'{args.seed}-T-reached.txt'
 
 
+def timeit(method):
+    def timed(*args, **kw):
+        start_time = time.time()
+        result = method(*args, **kw)
+        end_time = time.time()
+
+        print(f'{method.__name__} took {end_time - start_time:.2f} s')
+
+        return result
+    return timed
+
+
 def get_memory_file_path(name, folder=memory_save_folder):
   return os.path.join(folder, name)
 
 
+@timeit
 def load_memory(use_bz2=True):
   global replay_memory_pickle_bz2, replay_memory_pickle
 
@@ -124,6 +138,7 @@ def load_memory(use_bz2=True):
       return pickle.load(regular_pickle_file)
 
 
+@timeit
 def save_memory(memory, T_reached):
   global replay_memory_pickle_bz2, replay_memory_pickle_bz2_temp, replay_memory_T_reached
 
@@ -221,6 +236,9 @@ wandb.init(entity=args.wandb_entity, project=args.wandb_project, name=wandb_name
            dir=args.wandb_dir, config=vars(args))
 wandb.save(os.path.join(wandb.run.dir, '*.pth'))
 
+memory_save_folder = os.path.join(args.memory_save_folder, args.id)
+os.makedirs(memory_save_folder, exist_ok=True)
+
 
 # Simple ISO 8601 timestamped logger
 def log(s):
@@ -294,10 +312,6 @@ else:
         dqn.train()  # Set DQN (online network) back to training mode
 
         dqn.save(wandb.run.dir, f'{wandb_name}-{T}.pth')
-
-        memory_save_folder = os.path.join(args.memory_save_folder, args.id)
-        os.makedirs(memory_save_folder, exist_ok=True)
-
         save_memory(mem, T)
 
       # Update target network
