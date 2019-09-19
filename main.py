@@ -195,8 +195,14 @@ if args.wandb_resume:
       if T_memory != T_checkpoint:
         print(f'Timestep mismatch: wandb has {T_checkpoint}, while memory file has {T_memory}. Going with {T_resume}...')
 
-      # temporary condition to handle the non-zipped, old pickle files
+      # Now that we now that T_resume is, we can load from there.
+      try:
+        resume_checkpoint = existing_run.file(f'{wandb_name}-{T_resume}.pth')
+        resume_checkpoint.download(replace=True)
+      except (AttributeError, wandb.CommError) as e:
+        print('Failed to download most recent checkpoint, will not resume')
 
+      # temporary condition to handle the non-zipped, old pickle files
       if os.path.exists(get_memory_file_path(replay_memory_pickle)):
         loaded_replay_memory = load_memory(use_bz2=False)
         save_memory(loaded_replay_memory, T_memory)
@@ -204,15 +210,6 @@ if args.wandb_resume:
 
       else:
         loaded_replay_memory = load_memory()
-
-      # Now that we now that T_resume is, we can load from there.
-
-      try:
-        resume_checkpoint = existing_run.file(f'{wandb_name}-{T_resume}.pth')
-        resume_checkpoint.download(replace=True)
-
-      except (AttributeError, wandb.CommError) as e:
-        print('Failed to download most recent checkpoint, will not resume')
 
   if original_run_id is None:
     print(f'Failed to find run to resume for seed {args.seed}, running from scratch')
