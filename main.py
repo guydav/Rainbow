@@ -77,9 +77,8 @@ args = parser.parse_args()
 print(' ' * 26 + 'Options')
 for k, v in vars(args).items():
   print(' ' * 26 + k + ': ' + str(v))
-results_dir = os.path.join('results', args.id)
-if not os.path.exists(results_dir):
-  os.makedirs(results_dir)
+results_dir = os.path.join('results', f'{args.id}-{args.seed}')
+os.makedirs(results_dir, exist_ok=True)
 metrics = {'steps': [], 'rewards': [], 'Qs': [], 'best_avg_reward': -float('inf')}
 
 # Handle slurm array ids
