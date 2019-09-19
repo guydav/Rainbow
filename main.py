@@ -178,48 +178,53 @@ if args.wandb_resume:
     original_run_id = existing_run.id
 
     history = existing_run.history(pandas=True, samples=1000)
-    T_checkpoint = int(history['steps'].iat[-1])
 
-    if not os.path.exists(get_memory_file_path(replay_memory_T_reached)):
-      print('Couldn\'t find replay memory T reached file...')
+    # Verify there's actually a run to resume
+    if len(history) > 0:
+      T_checkpoint = int(history['steps'].iat[-1])
 
-    with open(get_memory_file_path(replay_memory_T_reached), 'r') as T_file:
-      T_memory = int(T_file.read())
+      if not os.path.exists(get_memory_file_path(replay_memory_T_reached)):
+        print('Couldn\'t find replay memory T reached file...')
 
-    # Take the min to resume from the earlier of the two potential points
-    T_resume = min(T_checkpoint, T_memory)
+      with open(get_memory_file_path(replay_memory_T_reached), 'r') as T_file:
+        T_memory = int(T_file.read())
 
-    if T_memory != T_checkpoint:
-      print(f'Timestep mismatch: wandb has {T_checkpoint}, while memory file has {T_memory}. Going with {T_resume}...')
+      # Take the min to resume from the earlier of the two potential points
+      T_resume = min(T_checkpoint, T_memory)
 
-    # temporary condition to handle the non-zipped, old pickle files
+      if T_memory != T_checkpoint:
+        print(f'Timestep mismatch: wandb has {T_checkpoint}, while memory file has {T_memory}. Going with {T_resume}...')
 
-    if os.path.exists(get_memory_file_path(replay_memory_pickle)):
-      loaded_replay_memory = load_memory(use_bz2=False)
-      save_memory(loaded_replay_memory, T_memory)
-      os.remove(get_memory_file_path(replay_memory_pickle))
+      # temporary condition to handle the non-zipped, old pickle files
 
-    else:
-      loaded_replay_memory = load_memory()
+      if os.path.exists(get_memory_file_path(replay_memory_pickle)):
+        loaded_replay_memory = load_memory(use_bz2=False)
+        save_memory(loaded_replay_memory, T_memory)
+        os.remove(get_memory_file_path(replay_memory_pickle))
 
-    # Now that we now that T_resume is, we can load from there.
+      else:
+        loaded_replay_memory = load_memory()
 
-    try:
-      resume_checkpoint = existing_run.file(f'{wandb_name}-{T_resume}.pth')
-      resume_checkpoint.download(replace=True)
+      # Now that we now that T_resume is, we can load from there.
 
-    except (AttributeError, wandb.CommError) as e:
-      print('Failed to download most recent checkpoint, will not resume')
+      try:
+        resume_checkpoint = existing_run.file(f'{wandb_name}-{T_resume}.pth')
+        resume_checkpoint.download(replace=True)
 
+      except (AttributeError, wandb.CommError) as e:
+        print('Failed to download most recent checkpoint, will not resume')
 
   if original_run_id is None:
     print(f'Failed to find run to resume for seed {args.seed}, running from scratch')
+
+  elif T_resume is None:
+    print(f'Failed to find the correct resume timestamp for seed {args.seed}, running from scratch')
 
   elif resume_checkpoint is None:
     print(f'Failed to find checkpoint to resume for seed {args.seed}, running from scratch')
 
   elif loaded_replay_memory is None:
-    print('Failed to load replay memory, running from scratch')
+    print('Failed to load replay memory for seed {args.seed}, running from scratch')
 
   else:
     os.environ['WANDB_RESUME'] = 'must'
