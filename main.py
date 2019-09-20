@@ -81,7 +81,7 @@ for k, v in vars(args).items():
 results_dir = os.path.join('results', f'{args.id}-{args.seed}')
 os.makedirs(results_dir, exist_ok=True)
 if args.evaluation_gifs:
-  os.makedirs(os.path.join(results_dir, 'eval_gifs', exist_ok=True))
+  os.makedirs(os.path.join(results_dir, 'eval_gifs'), exist_ok=True)
 
 metrics = {'steps': [], 'rewards': [], 'Qs': [], 'best_avg_reward': -float('inf')}
 

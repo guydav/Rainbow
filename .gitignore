@@ -96,3 +96,10 @@ ENV/
 
 # Weights and Biases
 wandb/
+
+# Results
+results/
+
+# DS_store
+.DS_Store
+._.DS_Store
