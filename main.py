@@ -56,6 +56,7 @@ parser.add_argument('--evaluation-size', type=int, default=500, metavar='N', hel
 parser.add_argument('--render', action='store_true', help='Display screen (testing only)')
 parser.add_argument('--enable-cudnn', action='store_true', help='Enable cuDNN (faster but nondeterministic)')
 parser.add_argument('--evaluation-gifs', action='store_true', help='Save GIFs of evaluation episodes')
+parser.add_argument('--evaluation-gif-folder', default=None, help='Folder to save evaluation GIFs in')
 
 # Custom arguments I added
 
@@ -80,8 +81,12 @@ for k, v in vars(args).items():
   print(' ' * 26 + k + ': ' + str(v))
 results_dir = os.path.join('results', f'{args.id}-{args.seed}')
 os.makedirs(results_dir, exist_ok=True)
+
+if args.evaluation_gif_folder is None:
+  args.evaluation_gif_folder = os.path.join(results_dir, 'eval_gifs')
+
 if args.evaluation_gifs:
-  os.makedirs(os.path.join(results_dir, 'eval_gifs', exist_ok=True))
+  os.makedirs(args.evaluation_gif_folder, exist_ok=True)
 
 metrics = {'steps': [], 'rewards': [], 'Qs': [], 'best_avg_reward': -float('inf')}
 
