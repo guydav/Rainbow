@@ -44,7 +44,8 @@ def test(args, T, dqn, val_mem, metrics, results_dir, evaluate=False):
       if done:
         T_rewards.append(reward_sum)
         if args.evaluation_gifs:
-          imageio.mimwrite(os.path.join(results_dir, 'eval_gifs', f'eval-{T}-{i}.gif'), gif_stack, fps=10)
+          imageio.mimwrite(os.path.join(results_dir, 'eval_gifs', f'eval-{T}-{i}.gif'),
+                           [(frame * 255).astype(np.uint8) for frame in gif_stack], fps=10)
         break
   env.close()
 
