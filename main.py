@@ -55,6 +55,7 @@ parser.add_argument('--evaluation-episodes', type=int, default=10, metavar='N', 
 parser.add_argument('--evaluation-size', type=int, default=500, metavar='N', help='Number of transitions to use for validating Q')
 parser.add_argument('--render', action='store_true', help='Display screen (testing only)')
 parser.add_argument('--enable-cudnn', action='store_true', help='Enable cuDNN (faster but nondeterministic)')
+parser.add_argument('--evaluation-gifs', action='store_true', help='Save GIFs of evaluation episodes')
 
 # Custom arguments I added
 
@@ -79,6 +80,9 @@ for k, v in vars(args).items():
   print(' ' * 26 + k + ': ' + str(v))
 results_dir = os.path.join('results', f'{args.id}-{args.seed}')
 os.makedirs(results_dir, exist_ok=True)
+if args.evaluation_gifs:
+  os.makedirs(os.path.join(results_dir, 'eval_gifs', exist_ok=True))
+
 metrics = {'steps': [], 'rewards': [], 'Qs': [], 'best_avg_reward': -float('inf')}
 
 # Handle slurm array ids
@@ -195,8 +199,14 @@ if args.wandb_resume:
       if T_memory != T_checkpoint:
         print(f'Timestep mismatch: wandb has {T_checkpoint}, while memory file has {T_memory}. Going with {T_resume}...')
 
-      # temporary condition to handle the non-zipped, old pickle files
+      # Now that we now that T_resume is, we can load from there.
+      try:
+        resume_checkpoint = existing_run.file(f'{wandb_name}-{T_resume}.pth')
+        resume_checkpoint.download(replace=True)
+      except (AttributeError, wandb.CommError) as e:
+        print('Failed to download most recent checkpoint, will not resume')
 
+      # temporary condition to handle the non-zipped, old pickle files
       if os.path.exists(get_memory_file_path(replay_memory_pickle)):
         loaded_replay_memory = load_memory(use_bz2=False)
         save_memory(loaded_replay_memory, T_memory)
@@ -204,15 +214,6 @@ if args.wandb_resume:
 
       else:
         loaded_replay_memory = load_memory()
-
-      # Now that we now that T_resume is, we can load from there.
-
-      try:
-        resume_checkpoint = existing_run.file(f'{wandb_name}-{T_resume}.pth')
-        resume_checkpoint.download(replace=True)
-
-      except (AttributeError, wandb.CommError) as e:
-        print('Failed to download most recent checkpoint, will not resume')
 
   if original_run_id is None:
     print(f'Failed to find run to resume for seed {args.seed}, running from scratch')
@@ -282,7 +283,7 @@ if args.wandb_resume and T_resume is not None:
 
 if args.evaluate:
   dqn.eval()  # Set DQN (online network) to evaluation mode
-  avg_reward, avg_Q = test(args, 0, dqn, val_mem, metrics, results_dir, evaluate=True)  # Test
+  avg_reward, avg_Q = test(args, T_start, dqn, val_mem, metrics, results_dir, evaluate=True)  # Test
   print('Avg. reward: ' + str(avg_reward) + ' | Avg. Q: ' + str(avg_Q))
 
 else:
