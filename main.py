@@ -55,6 +55,7 @@ parser.add_argument('--evaluation-episodes', type=int, default=10, metavar='N', 
 parser.add_argument('--evaluation-size', type=int, default=500, metavar='N', help='Number of transitions to use for validating Q')
 parser.add_argument('--render', action='store_true', help='Display screen (testing only)')
 parser.add_argument('--enable-cudnn', action='store_true', help='Enable cuDNN (faster but nondeterministic)')
+parser.add_argument('--evaluation-gifs', action='store_true', help='Save GIFs of evaluation episodes')
 
 # Custom arguments I added
 
@@ -79,6 +80,9 @@ for k, v in vars(args).items():
   print(' ' * 26 + k + ': ' + str(v))
 results_dir = os.path.join('results', f'{args.id}-{args.seed}')
 os.makedirs(results_dir, exist_ok=True)
+if args.evaluation_gifs:
+  os.makedirs(os.path.join(results_dir, 'eval_gifs', exist_ok=True))
+
 metrics = {'steps': [], 'rewards': [], 'Qs': [], 'best_avg_reward': -float('inf')}
 
 # Handle slurm array ids
@@ -279,7 +283,7 @@ if args.wandb_resume and T_resume is not None:
 
 if args.evaluate:
   dqn.eval()  # Set DQN (online network) to evaluation mode
-  avg_reward, avg_Q = test(args, 0, dqn, val_mem, metrics, results_dir, evaluate=True)  # Test
+  avg_reward, avg_Q = test(args, T_start, dqn, val_mem, metrics, results_dir, evaluate=True)  # Test
   print('Avg. reward: ' + str(avg_reward) + ' | Avg. Q: ' + str(avg_Q))
 
 else:

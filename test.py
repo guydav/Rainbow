@@ -7,6 +7,7 @@ from plotly.graph_objs.scatter import Line
 import torch
 import wandb
 import numpy as np
+import imageio
 
 from env import Env
 
@@ -20,19 +21,30 @@ def test(args, T, dqn, val_mem, metrics, results_dir, evaluate=False):
 
   # Test performance over several episodes
   done = True
-  for _ in range(args.evaluation_episodes):
+  for i in range(args.evaluation_episodes):
+    if args.evaluation_gifs:
+      gif_stack = []
+
     while True:
       if done:
         state, reward_sum, done = env.reset(), 0, False
+        if args.evaluation_gifs:
+          gif_stack.append(state[3].cpu().numpy())
 
       action = dqn.act_e_greedy(state)  # Choose an action ε-greedily
       state, reward, done = env.step(action)  # Step
+
+      if args.evaluation_gifs:
+        gif_stack.append(state[3].cpu().numpy())
+
       reward_sum += reward
       if args.render:
         env.render()
 
       if done:
         T_rewards.append(reward_sum)
+        if args.evaluation_gifs:
+          imageio.mimwrite(os.path.join(results_dir, 'eval_gifs', f'eval-{T}-{i}.gif'), gif_stack, fps=10)
         break
   env.close()
 
