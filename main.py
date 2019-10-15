@@ -55,8 +55,10 @@ parser.add_argument('--evaluation-episodes', type=int, default=10, metavar='N', 
 parser.add_argument('--evaluation-size', type=int, default=500, metavar='N', help='Number of transitions to use for validating Q')
 parser.add_argument('--render', action='store_true', help='Display screen (testing only)')
 parser.add_argument('--enable-cudnn', action='store_true', help='Enable cuDNN (faster but nondeterministic)')
-parser.add_argument('--evaluation-gifs', action='store_true', help='Save GIFs of evaluation episodes')
+parser.add_argument('--save-evaluation-gifs', action='store_true', help='Save GIFs of evaluation episodes')
 parser.add_argument('--evaluation-gif-folder', default=None, help='Folder to save evaluation GIFs in')
+parser.add_argument('--save-evaluation-states', action='store_true', help='Save the states of evaluation episodes')
+parser.add_argument('--evaluation-state-folder', default=None, help='Folder to save evaluation state in')
 
 # Custom arguments I added
 
@@ -83,10 +85,16 @@ results_dir = os.path.join('results', f'{args.id}-{args.seed}')
 os.makedirs(results_dir, exist_ok=True)
 
 if args.evaluation_gif_folder is None:
-  args.evaluation_gif_folder = os.path.join(results_dir, 'eval_gifs')
+  args.evaluation_gif_folder = os.path.join(results_dir, 'evaluation', 'gifs')
 
-if args.evaluation_gifs:
+if args.save_evaluation_gifs:
   os.makedirs(args.evaluation_gif_folder, exist_ok=True)
+
+if args.evaluation_state_folder is None:
+  args.evaluation_state_folder = os.path.join(results_dir, 'evaluation', 'states')
+
+if args.save_evaluation_states:
+  os.makedirs(args.evaluation_state_folder, exist_ok=True)
 
 metrics = {'steps': [], 'rewards': [], 'Qs': [], 'best_avg_reward': -float('inf')}
 

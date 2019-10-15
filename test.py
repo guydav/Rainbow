@@ -8,6 +8,7 @@ import torch
 import wandb
 import numpy as np
 import imageio
+import pickle
 
 from env import Env
 
@@ -22,19 +23,27 @@ def test(args, T, dqn, val_mem, metrics, results_dir, evaluate=False):
   # Test performance over several episodes
   done = True
   for i in range(args.evaluation_episodes):
-    if args.evaluation_gifs:
+    if args.save_evaluation_gifs:
       gif_stack = []
+
+    if args.save_evaluation_states:
+      grayscale_states = []
+      color_states = []
 
     while True:
       if done:
         state, reward_sum, done = env.reset(), 0, False
-        if args.evaluation_gifs:
+        if args.save_evaluation_gifs:
           gif_stack.append(state[3].cpu().numpy())
+
+        if args.save_evaluation_states:
+          grayscale_states.append(np.moveaxis(env.ale.getScreenGrayscale(), 2, 0))
+          color_states.append(np.expand_dims(np.moveaxis(env.ale.getScreenRGB(), 2, 0), 0))
 
       action = dqn.act_e_greedy(state)  # Choose an action ε-greedily
       state, reward, done = env.step(action)  # Step
 
-      if args.evaluation_gifs:
+      if args.save_evaluation_gifs:
         gif_stack.append(state[3].cpu().numpy())
 
       reward_sum += reward
@@ -43,9 +52,19 @@ def test(args, T, dqn, val_mem, metrics, results_dir, evaluate=False):
 
       if done:
         T_rewards.append(reward_sum)
-        if args.evaluation_gifs:
+        if args.save_evaluation_gifs:
           imageio.mimwrite(os.path.join(args.evaluation_gif_folder, f'eval-{args.id}-{args.seed}-{T}-{i}.gif'),
-                           [(frame * 255).astype(np.uint8) for frame in gif_stack], fps=10)
+                           [(frame * 255).astype(np.uint8) for frame in gif_stack], fps=60)
+
+        if args.save_evaluation_states:
+          with open(os.path.join(args.evaluation_state_folder, f'eval-{args.id}-{args.seed}-{T}-{i}-gray.pickle')) \
+            as gray_file:
+            pickle.dump(np.concatenate(grayscale_states), gray_file)
+
+          with open(os.path.join(args.evaluation_state_folder, f'eval-{args.id}-{args.seed}-{T}-{i}-color.pickle')) \
+            as color_file:
+            pickle.dump(np.concatenate(color_states), color_file)
+
         break
   env.close()
 
