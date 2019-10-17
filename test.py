@@ -46,6 +46,10 @@ def test(args, T, dqn, val_mem, metrics, results_dir, evaluate=False):
       if args.save_evaluation_gifs:
         gif_stack.append(state[3].cpu().numpy())
 
+      if args.save_evaluation_states:
+        grayscale_states.append(np.moveaxis(env.ale.getScreenGrayscale(), 2, 0))
+        color_states.append(np.expand_dims(np.moveaxis(env.ale.getScreenRGB(), 2, 0), 0))
+
       reward_sum += reward
       if args.render:
         env.render()
