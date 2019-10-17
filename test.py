@@ -57,11 +57,11 @@ def test(args, T, dqn, val_mem, metrics, results_dir, evaluate=False):
                            [(frame * 255).astype(np.uint8) for frame in gif_stack], fps=60)
 
         if args.save_evaluation_states:
-          with open(os.path.join(args.evaluation_state_folder, f'eval-{args.id}-{args.seed}-{T}-{i}-gray.pickle'), 'w') \
+          with open(os.path.join(args.evaluation_state_folder, f'eval-{args.id}-{args.seed}-{T}-{i}-gray.pickle'), 'wb') \
             as gray_file:
             pickle.dump(np.concatenate(grayscale_states), gray_file)
 
-          with open(os.path.join(args.evaluation_state_folder, f'eval-{args.id}-{args.seed}-{T}-{i}-color.pickle'), 'w') \
+          with open(os.path.join(args.evaluation_state_folder, f'eval-{args.id}-{args.seed}-{T}-{i}-color.pickle'), 'wb') \
             as color_file:
             pickle.dump(np.concatenate(color_states), color_file)
 
