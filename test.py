@@ -48,7 +48,7 @@ def test(args, T, dqn, val_mem, metrics, results_dir, evaluate=False):
 
       if args.save_evaluation_states:
         grayscale_states.append(np.moveaxis(env.ale.getScreenGrayscale(), 2, 0))
-        color_states.append(np.expand_dims(np.moveaxis(env.ale.getScreenRGB(), 2, 0), 0))
+        color_states.append(np.expand_dims(env.ale.getScreenRGB(), 0))
 
       reward_sum += reward
       if args.render:
@@ -58,7 +58,7 @@ def test(args, T, dqn, val_mem, metrics, results_dir, evaluate=False):
         T_rewards.append(reward_sum)
         if args.save_evaluation_gifs:
           imageio.mimwrite(os.path.join(args.evaluation_gif_folder, f'eval-{args.id}-{args.seed}-{T}-{i}.gif'),
-                           [(frame * 255).astype(np.uint8) for frame in gif_stack], fps=60)
+                           [(frame * 255).astype(np.uint8) for frame in gif_stack], fps=15)
 
         if args.save_evaluation_states:
           with open(os.path.join(args.evaluation_state_folder, f'eval-{args.id}-{args.seed}-{T}-{i}-gray.pickle'), 'wb') \
