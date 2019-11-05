@@ -121,7 +121,7 @@ class MaskerEnv(Env):
     self.maskers = maskers
 
   def _augment_state(self, observation, full_color_state):
-    masks = [self._to_tensor(self._resize(masker(full_color_state)), dtype=torch.uint8)
+    masks = [self._to_tensor(self._resize(masker(full_color_state)), dtype=torch.float32)
              for masker in self.maskers]
     return torch.stack((observation, *masks), dim=0)
 

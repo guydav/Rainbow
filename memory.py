@@ -74,10 +74,11 @@ class ReplayMemory():
     self.priority_exponent = args.priority_exponent
     self.t = 0  # Internal episode timestep counter
     self.transitions = SegmentTree(capacity)  # Store transitions in a wrap-around cyclic buffer within a sum tree for querying priorities
+    self.state_depth = args.state_depth
 
   # Adds state and action at time t, reward and terminal at time t + 1
   def append(self, state, action, reward, terminal):
-    state = state[-1].mul(255).to(dtype=torch.uint8, device=torch.device('cpu'))  # Only store last frame and discretise to save memory
+    state = state[-self.state_depth:].mul(255).state.to(dtype=torch.uint8, device=torch.device('cpu'))  # Only store last frame and discretise to save memory
     self.transitions.append(Transition(self.t, state, action, reward, not terminal), self.transitions.max)  # Store new transition with maximum priority
     self.t = 0 if terminal else self.t + 1  # Start new episodes with t = 0
 
@@ -133,7 +134,6 @@ class ReplayMemory():
     weights = (capacity * probs) ** -self.priority_weight  # Compute importance-sampling weights w
     weights = torch.tensor(weights / weights.max(), dtype=torch.float32, device=self.device)  # Normalise by max importance-sampling weight from batch
     return tree_idxs, states, actions, returns, next_states, nonterminals, weights
-
 
   def update_priorities(self, idxs, priorities):
     priorities = np.power(priorities, self.priority_exponent)

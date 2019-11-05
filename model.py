@@ -51,10 +51,7 @@ class DQN(nn.Module):
     super(DQN, self).__init__()
     self.atoms = args.atoms
     self.action_space = action_space
-
-    state_depth = 1
-    if 'state_depth' in args:
-      state_depth = args.state_depth
+    state_depth = args.state_depth
 
     if args.architecture == 'canonical':
       self.convs = nn.Sequential(nn.Conv2d(args.history_length, 32, 8, stride=4, padding=0), nn.ReLU(),
