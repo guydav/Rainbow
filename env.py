@@ -39,7 +39,7 @@ class Env():
 
   def _reset_buffer(self):
     for _ in range(self.window):
-      self.state_buffer.append(torch.zeros(84, 84, device=self.device))
+      self.state_buffer.append(torch.zeros(1, 84, 84, device=self.device))
 
   def _augment_state(self, observation, full_color_state):
     if len(observation.shape) == 2:
