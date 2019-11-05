@@ -81,7 +81,7 @@ class Env():
       if done:
         break
 
-    observation, indices = frame_buffer.max(0)[0]
+    observation, indices = frame_buffer.max(0)
     full_color_observation = torch.squeeze(torch.gather(full_color_frame_buffer, 0, torch.unsqueeze(indices, 0)))
     augmented_state = self._augment_state(observation, full_color_observation)
 
