@@ -15,9 +15,10 @@ from tqdm import tqdm, trange
 import wandb
 
 from agent import Agent
-from env import Env
+from env import Env, MaskerEnv
 from memory import ReplayMemory
 from test import test
+from masker import ALL_MASKERS
 
 
 
@@ -75,6 +76,9 @@ parser.add_argument('--wandb-resume', action='store_true')
 DEFAULT_MEMORY_SAVE_FOLDER = os.path.join(SCRATCH_FOLDER, 'rainbow_memory')
 parser.add_argument('--memory-save-folder', default=DEFAULT_MEMORY_SAVE_FOLDER)
 
+# Arguments for the augmented representations
+parser.add_argument('--add-masks', action='store_true')
+parser.add_argument('--maskers', default=None)
 
 # Setup
 args = parser.parse_args()
@@ -263,8 +267,19 @@ def log(s):
   print('[' + str(datetime.now().strftime('%Y-%m-%dT%H:%M:%S')) + '] ' + s)
 
 
-# Environment
-env = Env(args)
+# Augmented representations and Environments
+if args.add_masks:
+  if args.maskers is None:
+    maskers = list(ALL_MASKERS.values())
+  else:
+    maskers = [ALL_MASKERS[name.strip().lower()] for name in args.maskers.split(',')]
+
+  args.state_depth = 1 + len(maskers)
+  env = MaskerEnv(args, maskers)
+
+else:
+  env = Env(args)
+
 env.train()
 action_space = env.action_space()
 

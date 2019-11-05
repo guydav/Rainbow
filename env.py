@@ -4,10 +4,11 @@ import random
 import atari_py
 import cv2
 import torch
+import numpy as np
 
 
 class Env():
-  def __init__(self, args):
+  def __init__(self, args, state_size=1):
     self.device = args.device
     self.ale = atari_py.ALEInterface()
     self.ale.setInt('random_seed', args.seed)
@@ -24,13 +25,26 @@ class Env():
     self.state_buffer = deque([], maxlen=args.history_length)
     self.training = True  # Consistent with model training mode
 
+    self.state_size = state_size
+
+  def _resize(self, frame):
+    return cv2.resize(frame, (84, 84), interpolation=cv2.INTER_LINEAR)
+
+  def _to_tensor(self, frame, dtype=torch.float32):
+    return torch.tensor(frame, dtype=dtype, device=self.device)
+
   def _get_state(self):
-    state = cv2.resize(self.ale.getScreenGrayscale(), (84, 84), interpolation=cv2.INTER_LINEAR)
-    return torch.tensor(state, dtype=torch.float32, device=self.device).div_(255)
+    frame = self._resize(self.ale.getScreenGrayscale())
+    return self._to_tensor(frame).div_(255)
 
   def _reset_buffer(self):
     for _ in range(self.window):
       self.state_buffer.append(torch.zeros(84, 84, device=self.device))
+
+  def _augment_state(self, observation, full_color_state):
+    if len(observation.shape) == 2:
+      observation = torch.unsqueeze(observation, 0)
+    return observation
 
   def reset(self):
     if self.life_termination:
@@ -47,25 +61,31 @@ class Env():
           self.ale.reset_game()
     # Process and return "initial" state
     observation = self._get_state()
-    self.state_buffer.append(observation)
+    augmented_state = self._augment_state(observation, self.ale.getScreenRGB())
+
+    self.state_buffer.append(augmented_state)
     self.lives = self.ale.lives()
-    return torch.stack(list(self.state_buffer), 0)
+    return torch.cat(list(self.state_buffer), 0)
 
   def step(self, action):
     # Repeat action 4 times, max pool over last 2 frames
     frame_buffer = torch.zeros(2, 84, 84, device=self.device)
+    full_color_frame_buffer = np.zeros((2, 3, 210, 160))
     reward, done = 0, False
     for t in range(4):
       reward += self.ale.act(self.actions.get(action))
-      if t == 2:
-        frame_buffer[0] = self._get_state()
-      elif t == 3:
-        frame_buffer[1] = self._get_state()
+      if t >= 2:
+        frame_buffer[t - 2] = self._get_state()
+        full_color_frame_buffer[t - 2] = self.ale.getScreenRGB()
       done = self.ale.game_over()
       if done:
         break
-    observation = frame_buffer.max(0)[0]
-    self.state_buffer.append(observation)
+
+    observation, indices = frame_buffer.max(0)[0]
+    full_color_observation = torch.squeeze(torch.gather(full_color_frame_buffer, 0, torch.unsqueeze(indices, 0)))
+    augmented_state = self._augment_state(observation, full_color_observation)
+
+    self.state_buffer.append(augmented_state)
     # Detect loss of life as terminal in training mode
     if self.training:
       lives = self.ale.lives()
@@ -74,7 +94,7 @@ class Env():
         done = True
       self.lives = lives
     # Return state, reward, done
-    return torch.stack(list(self.state_buffer), 0), reward, done
+    return torch.cat(list(self.state_buffer), 0), reward, done
 
   # Uses loss of life as terminal signal
   def train(self):
@@ -93,3 +113,20 @@ class Env():
 
   def close(self):
     cv2.destroyAllWindows()
+
+
+class MaskerEnv(Env):
+  def __init__(self, args, maskers):
+    super(MaskerEnv, self).__init__(args, state_size=1 + len(maskers))
+    self.maskers = maskers
+
+  def _augment_state(self, observation, full_color_state):
+    masks = [self._to_tensor(self._resize(masker(full_color_state)), dtype=torch.uint8)
+             for masker in self.maskers]
+    return torch.stack((observation, *masks), dim=0)
+
+
+
+
+
+
