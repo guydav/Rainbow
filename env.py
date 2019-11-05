@@ -84,7 +84,7 @@ class Env():
     observation, indices = frame_buffer.max(0)
     full_color_observation = torch.squeeze(torch.gather(torch.tensor(full_color_frame_buffer, dtype=torch.float32),
                                                         0, torch.unsqueeze(indices.cpu(), 0)))
-    augmented_state = self._augment_state(observation, full_color_observation)
+    augmented_state = self._augment_state(observation, full_color_observation.numpy())
 
     self.state_buffer.append(augmented_state)
     # Detect loss of life as terminal in training mode

@@ -11,6 +11,7 @@ class ColorFilterMasker:
   def __call__(self, frame):
     """
     Assumes the frame is of the form [h, w, c]
+    # TODO: reimplement this natively with torch operations at some point, so I don't have to transition to numpy and back
     """
     mask = np.any(np.all(np.equal(np.expand_dims(frame, 3), self.filter_colors), axis=2), axis=2).astype(np.uint8)
 
