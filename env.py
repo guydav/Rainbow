@@ -70,7 +70,7 @@ class Env():
   def step(self, action):
     # Repeat action 4 times, max pool over last 2 frames
     frame_buffer = torch.zeros(2, 84, 84, device=self.device)
-    full_color_frame_buffer = np.zeros((2, 3, 210, 160))
+    full_color_frame_buffer = np.zeros((2, 210, 160, 3))
     reward, done = 0, False
     for t in range(4):
       reward += self.ale.act(self.actions.get(action))
