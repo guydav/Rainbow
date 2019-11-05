@@ -83,7 +83,7 @@ class Env():
 
     observation, indices = frame_buffer.max(0)
     full_color_observation = torch.squeeze(torch.gather(torch.tensor(full_color_frame_buffer, dtype=torch.float32),
-                                                        0, torch.unsqueeze(indices, 0)))
+                                                        0, torch.unsqueeze(indices.cpu(), 0)))
     augmented_state = self._augment_state(observation, full_color_observation)
 
     self.state_buffer.append(augmented_state)
