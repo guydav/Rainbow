@@ -77,7 +77,7 @@ class Env():
     for t in range(4):
       reward += self.ale.act(self.actions.get(action))
       if t >= 2:
-        frame_buffer[t - 2] = self.ale.getScreenGrayscale()
+        frame_buffer[t - 2] = self.ale.getScreenGrayscale().squeeze()
         full_color_frame_buffer[t - 2] = self.ale.getScreenRGB()
       done = self.ale.game_over()
       if done:
