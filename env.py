@@ -12,7 +12,7 @@ SMALL_SHAPE = (84, 84)
 
 
 class Env():
-  def __init__(self, args, state_size=1):
+  def __init__(self, args):
     self.device = args.device
     self.ale = atari_py.ALEInterface()
     self.ale.setInt('random_seed', args.seed)
@@ -28,8 +28,7 @@ class Env():
     self.window = args.history_length  # Number of frames to concatenate
     self.state_buffer = deque([], maxlen=args.history_length)
     self.training = True  # Consistent with model training mode
-
-    self.state_size = state_size
+    self.state_depth = args.state_depth
 
   def _resize(self, frame):
     return cv2.resize(frame, SMALL_SHAPE, interpolation=cv2.INTER_LINEAR)
@@ -38,7 +37,7 @@ class Env():
     return torch.tensor(frame, dtype=dtype, device=self.device)
 
   def _reset_buffer(self):
-    for _ in range(self.window):
+    for _ in range(self.window * self.state_depth):
       self.state_buffer.append(torch.zeros(1, *SMALL_SHAPE, device=self.device))
 
   def _prepare_state(self, observation, full_color_state):

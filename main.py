@@ -274,12 +274,12 @@ if args.add_masks:
   else:
     maskers = [ALL_MASKERS[name.strip().lower()] for name in args.maskers.split(',')]
 
-  env = MaskerEnv(args, maskers)
   args.state_depth = 1 + len(maskers)
+  env = MaskerEnv(args, maskers)
 
 else:
-  env = Env(args)
   args.state_depth = 1
+  env = Env(args)
 
 env.train()
 action_space = env.action_space()
