@@ -66,8 +66,7 @@ class Env():
         if self.ale.game_over():
           self.ale.reset_game()
     # Process and return "initial" state
-    observation = self.ale.getScreenGrayscale()
-    state = self._prepare_state(self._resize(observation), self.ale.getScreenRGB())
+    state = self._prepare_state(self.ale.getScreenGrayscale(), self.ale.getScreenRGB())
 
     self.state_buffer.append(state)
     self.lives = self.ale.lives()
