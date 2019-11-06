@@ -125,7 +125,7 @@ class Env():
 
 class MaskerEnv(Env):
   def __init__(self, args, maskers):
-    super(MaskerEnv, self).__init__(args, state_size=1 + len(maskers))
+    super(MaskerEnv, self).__init__(args)
     self.maskers = maskers
 
   def _augment_state(self, full_color_state):
