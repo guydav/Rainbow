@@ -90,7 +90,7 @@ class Env():
     # resized_shape[3] = 3
     # full_color_observation = torch.squeeze(torch.gather(torch.tensor(full_color_frame_buffer, dtype=torch.float32),
     #                                                     0, resized_indices.expand(*resized_shape)))
-    full_color_observation = [indices, np.arange(FULL_SHAPE[0])[:, None], np.arange(FULL_SHAPE[1])]
+    full_color_observation = full_color_frame_buffer[indices, np.arange(FULL_SHAPE[0])[:, None], np.arange(FULL_SHAPE[1])]
     # TODO: avoid the call to .numpy() here if I rewrite the masker to be native in torch
     state = self._prepare_state(observation, full_color_observation)
     self.state_buffer.append(state)
