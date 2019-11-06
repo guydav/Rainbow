@@ -54,7 +54,7 @@ class DQN(nn.Module):
     state_depth = args.state_depth
 
     if args.architecture == 'canonical':
-      self.convs = nn.Sequential(nn.Conv2d(args.history_length, 32, 8, stride=4, padding=0), nn.ReLU(),
+      self.convs = nn.Sequential(nn.Conv2d(args.history_length * args.state_depth, 32, 8, stride=4, padding=0), nn.ReLU(),
                                  nn.Conv2d(32, 64, 4, stride=2, padding=0), nn.ReLU(),
                                  nn.Conv2d(64, 64, 3, stride=1, padding=0), nn.ReLU())
       self.conv_output_size = 3136 * state_depth
