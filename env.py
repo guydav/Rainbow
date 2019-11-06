@@ -43,11 +43,8 @@ class Env():
 
   def _prepare_state(self, observation, full_color_state):
     observation = self._to_tensor(self._resize(observation)).div_(255)
-    if len(observation.shape) == 2:
-      observation = torch.unsqueeze(observation, 0)
-
     augmentation = self._augment_state(full_color_state)
-    return torch.cat((observation, *augmentation))
+    return torch.stack((observation, *augmentation))
 
   def _augment_state(self, full_color_state):
     return list()
