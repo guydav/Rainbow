@@ -26,7 +26,7 @@ class Env():
     self.lives = 0  # Life counter (used in DeepMind training)
     self.life_termination = False  # Used to check if resetting only from loss of life
     self.window = args.history_length  # Number of frames to concatenate
-    self.state_buffer = deque([], maxlen=args.history_length)
+    self.state_buffer = deque([], maxlen=args.history_length * args.state_depth)
     self.training = True  # Consistent with model training mode
     self.state_depth = args.state_depth
 
