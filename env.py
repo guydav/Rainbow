@@ -26,7 +26,7 @@ class Env():
     self.lives = 0  # Life counter (used in DeepMind training)
     self.life_termination = False  # Used to check if resetting only from loss of life
     self.window = args.history_length  # Number of frames to concatenate
-    self.state_buffer = deque([], maxlen=args.history_length * args.state_depth)
+    self.state_buffer = deque([], maxlen=args.history_length)
     self.training = True  # Consistent with model training mode
     self.state_depth = args.state_depth
 
@@ -37,8 +37,8 @@ class Env():
     return torch.tensor(frame, dtype=dtype, device=self.device)
 
   def _reset_buffer(self):
-    for _ in range(self.window * self.state_depth):
-      self.state_buffer.append(torch.zeros(1, *SMALL_SHAPE, device=self.device))
+    for _ in range(self.window):
+      self.state_buffer.append(torch.zeros(self.state_depth, *SMALL_SHAPE, device=self.device))
 
   def _prepare_state(self, observation, full_color_state):
     observation = self._to_tensor(self._resize(observation)).div_(255)

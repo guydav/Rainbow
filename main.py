@@ -323,7 +323,8 @@ else:
     if done:
       state, done = env.reset(), False
 
-    # print(type(env), args.state_depth, state.shape, len(env.state_buffer), env.state_buffer[0].shape)
+      print(type(env), args.state_depth, state.shape, len(env.state_buffer), env.state_buffer.maxlen,
+            env.state_buffer[0].shape)
 
     if T % args.replay_frequency == 0:
       dqn.reset_noise()  # Draw a new set of noisy weights
