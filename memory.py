@@ -77,8 +77,10 @@ class ReplayMemory():
 
     if self.state_depth > 1:
       self.blank_trans = Transition(0, torch.zeros(self.state_depth, 84, 84, dtype=torch.uint8), None, 0, False)
+      self.concat_op = torch.cat
     else:
       self.blank_trans = Transition(0, torch.zeros(84, 84, dtype=torch.uint8), None, 0, False)
+      self.concat_op = torch.stack
 
   # Adds state and action at time t, reward and terminal at time t + 1
   def append(self, state, action, reward, terminal):
@@ -115,12 +117,8 @@ class ReplayMemory():
     # Retrieve all required transition data (from t - h to t + n)
     transition = self._get_transition(idx)
     # Create un-discretised state and nth next state
-    if self.state_depth > 1:
-      concat_op = torch.cat
-    else:
-      concat_op = torch.stack
-    state = concat_op([trans.state for trans in transition[:self.history]]).to(device=self.device).to(dtype=torch.float32).div_(255)
-    next_state = concat_op([trans.state for trans in transition[self.n:self.n + self.history]]).to(device=self.device).to(dtype=torch.float32).div_(255)
+    state = self.concat_op([trans.state for trans in transition[:self.history]]).to(device=self.device).to(dtype=torch.float32).div_(255)
+    next_state = self.concat_op([trans.state for trans in transition[self.n:self.n + self.history]]).to(device=self.device).to(dtype=torch.float32).div_(255)
     # Discrete action to be used as index
     action = torch.tensor([transition[self.history - 1].action], dtype=torch.int64, device=self.device)
     # Calculate truncated n-step discounted return R^n = Σ_k=0->n-1 (γ^k)R_t+k+1 (note that invalid nth next states have reward 0)
@@ -166,7 +164,7 @@ class ReplayMemory():
       else:
         state_stack[t] = self.transitions.data[self.current_idx + t - self.history + 1].state
         prev_timestep -= 1
-    state = torch.stack(state_stack, 0).to(dtype=torch.float32, device=self.device).div_(255)  # Agent will turn into batch
+    state = self.concat_op(state_stack, 0).to(dtype=torch.float32, device=self.device).div_(255)  # Agent will turn into batch
     self.current_idx += 1
     return state
 
