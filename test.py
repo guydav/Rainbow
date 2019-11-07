@@ -9,11 +9,13 @@ import wandb
 import numpy as np
 import imageio
 import pickle
+from profilehooks import profile
 
 from env import make_env
 
 
 # Test DQN
+@profile(immediate=True)
 def test(args, T, dqn, val_mem, metrics, results_dir, evaluate=False):
   env = make_env(args)
   env.eval()
@@ -30,7 +32,11 @@ def test(args, T, dqn, val_mem, metrics, results_dir, evaluate=False):
       grayscale_states = []
       color_states = []
 
+    debug_count = 0
+
     while True:
+      debug_count += 1
+
       if done:
         state, reward_sum, done = env.reset(), 0, False
         if args.save_evaluation_gifs:
@@ -53,6 +59,9 @@ def test(args, T, dqn, val_mem, metrics, results_dir, evaluate=False):
       reward_sum += reward
       if args.render:
         env.render()
+
+      if debug_count % 100 == 0:
+        print(f'Episode {i}, step {debug_count}, reward {reward_sum}, lives {env.ale.lives()}')
 
       if done:
         T_rewards.append(reward_sum)
