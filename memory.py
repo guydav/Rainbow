@@ -111,6 +111,8 @@ class ReplayMemory():
     # Retrieve all required transition data (from t - h to t + n)
     transition = self._get_transition(idx)
     # Create un-discretised state and nth next state
+    print([trans.state.shape for trans in transition[:self.history]])
+    print([trans.state == blank_trans for trans in transition[:self.history]])
     state = torch.stack([trans.state for trans in transition[:self.history]]).to(device=self.device).to(dtype=torch.float32).div_(255)
     next_state = torch.stack([trans.state for trans in transition[self.n:self.n + self.history]]).to(device=self.device).to(dtype=torch.float32).div_(255)
     # Discrete action to be used as index
