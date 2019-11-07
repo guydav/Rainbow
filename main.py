@@ -15,7 +15,7 @@ from tqdm import tqdm, trange
 import wandb
 
 from agent import Agent
-from env import Env, MaskerEnv
+from env import make_env
 from memory import ReplayMemory
 from test import test
 from masker import ALL_MASKERS
@@ -268,19 +268,7 @@ def log(s):
 
 
 # Augmented representations and Environments
-if args.add_masks:
-  if args.maskers is None:
-    maskers = list(ALL_MASKERS.values())
-  else:
-    maskers = [ALL_MASKERS[name.strip().lower()] for name in args.maskers.split(',')]
-
-  args.state_depth = 1 + len(maskers)
-  env = MaskerEnv(args, maskers)
-
-else:
-  args.state_depth = 1
-  env = Env(args)
-
+env = make_env(args)
 env.train()
 action_space = env.action_space()
 

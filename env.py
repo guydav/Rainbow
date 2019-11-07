@@ -5,6 +5,7 @@ import atari_py
 import cv2
 import torch
 import numpy as np
+from masker import ALL_MASKERS
 
 
 FULL_SHAPE = (210, 160)
@@ -132,6 +133,21 @@ class MaskerEnv(Env):
     return [self._to_tensor(self._resize(masker(full_color_state)), dtype=torch.float32)
             for masker in self.maskers]
 
+
+def make_env(args):
+  args.state_depth = 1
+
+  if args.add_masks:
+    if args.maskers is None:
+      maskers = list(ALL_MASKERS.values())
+    else:
+      maskers = [ALL_MASKERS[name.strip().lower()] for name in args.maskers.split(',')]
+
+    args.state_depth += len(maskers)
+    return MaskerEnv(args, maskers)
+
+  else:
+    return Env(args)
 
 
 
