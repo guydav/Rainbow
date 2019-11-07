@@ -60,10 +60,8 @@ def test(args, T, dqn, val_mem, metrics, results_dir, evaluate=False):
       if args.render:
         env.render()
 
-      if debug_count % 100 == 0:
-        print(f'Episode {i}, step {debug_count}, reward {reward_sum}, lives {env.ale.lives()}')
-
       if done:
+        print(f'Episode {i}, steps {debug_count}, reward {reward_sum}')
         T_rewards.append(reward_sum)
         if args.save_evaluation_gifs:
           imageio.mimwrite(os.path.join(args.evaluation_gif_folder, f'eval-{args.id}-{args.seed}-{T}-{i}.gif'),
