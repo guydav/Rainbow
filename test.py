@@ -10,12 +10,25 @@ import numpy as np
 import imageio
 import pickle
 
-from env import Env
+from env import Env, MaskerEnv
+from masker import ALL_MASKERS
 
 
 # Test DQN
 def test(args, T, dqn, val_mem, metrics, results_dir, evaluate=False):
-  env = Env(args)
+  if args.add_masks:
+    if args.maskers is None:
+      maskers = list(ALL_MASKERS.values())
+    else:
+      maskers = [ALL_MASKERS[name.strip().lower()] for name in args.maskers.split(',')]
+
+    args.state_depth = 1 + len(maskers)
+    env = MaskerEnv(args, maskers)
+
+  else:
+    args.state_depth = 1
+    env = Env(args)
+  
   env.eval()
   metrics['steps'].append(T)
   T_rewards, T_Qs = [], []

@@ -115,8 +115,6 @@ class ReplayMemory():
     # Retrieve all required transition data (from t - h to t + n)
     transition = self._get_transition(idx)
     # Create un-discretised state and nth next state
-    print([trans.state.shape for trans in transition[:self.history]])
-    # print([trans == self.blank_trans for trans in transition[:self.history]])
     if self.state_depth > 1:
       concat_op = torch.cat
     else:
