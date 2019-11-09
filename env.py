@@ -32,7 +32,7 @@ class Env():
     self.state_depth = args.state_depth
 
   def _resize(self, frame):
-    return cv2.resize(frame, SMALL_SHAPE, interpolation=cv2.INTER_LINEAR)
+    return  cv2.resize(frame, SMALL_SHAPE, interpolation=cv2.INTER_LINEAR)
 
   def _to_tensor(self, frame, dtype=torch.float32):
     return torch.tensor(frame, dtype=dtype, device=self.device)
@@ -130,7 +130,7 @@ class MaskerEnv(Env):
     self.maskers = maskers
 
   def _augment_state(self, full_color_state):
-    return [self._to_tensor(self._resize(masker(full_color_state)), dtype=torch.float32)
+    return [self._to_tensor(self._resize(masker(full_color_state)))
             for masker in self.maskers]
 
 

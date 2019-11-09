@@ -3,7 +3,8 @@ import numpy as np
 
 class ColorFilterMasker:
   def __init__(self, filter_colors, row_range=(None, None), col_range=(None, None), range_whitelist=False):
-    self.filter_colors = np.stack([np.array(x).reshape(1, 1, 3) for x in filter_colors], axis=3)
+    # TODO: check if the filter colors are a uint8, what that does
+    self.filter_colors = np.stack([np.array(x, dtype=np.uint8).reshape(1, 1, 3) for x in filter_colors], axis=3)
     self.row_range = row_range
     self.col_range = col_range
     self.range_whitelist = range_whitelist
@@ -13,6 +14,7 @@ class ColorFilterMasker:
     Assumes the frame is of the form [h, w, c]
     # TODO: reimplement this natively with torch operations at some point, so I don't have to transition to numpy and back
     """
+    # TODO: check if expanding filter_colors to the dimensions of the frame helps
     mask = np.any(np.all(np.equal(np.expand_dims(frame, 3), self.filter_colors), axis=2), axis=2).astype(np.uint8)
 
     if self.range_whitelist:
