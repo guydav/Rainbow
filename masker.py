@@ -4,7 +4,8 @@ import numpy as np
 class ColorFilterMasker:
   def __init__(self, filter_colors, row_range=(None, None), col_range=(None, None), range_whitelist=False):
     # TODO: check if the filter colors are a uint8, what that does
-    self.filter_colors = np.stack([np.array(x, dtype=np.uint8).reshape(1, 1, 3) for x in filter_colors], axis=3)
+    self.filter_colors = np.stack([np.tile(np.array(x, dtype=np.uint8).reshape(1, 1, 3), (210, 160, 3))
+                                   for x in filter_colors], axis=3)
     self.row_range = row_range
     self.col_range = col_range
     self.range_whitelist = range_whitelist
