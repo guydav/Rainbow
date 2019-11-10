@@ -5,11 +5,7 @@ import atari_py
 import cv2
 import torch
 import numpy as np
-from masker import ALL_MASKERS
-
-
-FULL_SHAPE = (210, 160)
-SMALL_SHAPE = (84, 84)
+from masker import ALL_MASKERS, FULL_FRAME_SHAPE, SMALL_FRAME_SHAPE, ColorFilterMasker, TorchMasker
 
 
 class Env():
@@ -32,19 +28,26 @@ class Env():
     self.state_depth = args.state_depth
 
   def _resize(self, frame):
-    return  cv2.resize(frame, SMALL_SHAPE, interpolation=cv2.INTER_LINEAR)
+    if isinstance(frame, torch.Tensor):
+      return torch.nn.functional.interpolate(frame.view(1, *frame.shape), SMALL_FRAME_SHAPE, mode='linear')
+    else:
+      return cv2.resize(frame, SMALL_FRAME_SHAPE, interpolation=cv2.INTER_LINEAR)
 
   def _to_tensor(self, frame, dtype=torch.float32):
     return torch.tensor(frame, dtype=dtype, device=self.device)
 
   def _reset_buffer(self):
     for _ in range(self.window):
-      self.state_buffer.append(torch.zeros(self.state_depth, *SMALL_SHAPE, device=self.device))
+      self.state_buffer.append(torch.zeros(self.state_depth, *SMALL_FRAME_SHAPE, device=self.device))
 
   def _prepare_state(self, observation, full_color_state):
-    observation = self._to_tensor(self._resize(observation)).div_(255)
+    observation = observation.div_(255)
     augmentation = self._augment_state(full_color_state)
-    return torch.stack((observation, *augmentation))
+
+    if isinstance(augmentation, torch.Tensor):
+      return torch.cat((observation.view(-1, *observation.shape), augmentation))
+    else:
+      return torch.stack((observation, *augmentation))
 
   def _augment_state(self, full_color_state):
     return list()
@@ -63,7 +66,8 @@ class Env():
         if self.ale.game_over():
           self.ale.reset_game()
     # Process and return "initial" state
-    state = self._prepare_state(self.ale.getScreenGrayscale(), self.ale.getScreenRGB())
+    state = self._prepare_state(self._to_tensor(self.ale.getScreenGrayscale()),
+                                self._to_tensor(self.ale.getScreenRGB()))
 
     self.state_buffer.append(state)
     self.lives = self.ale.lives()
@@ -71,27 +75,30 @@ class Env():
 
   def step(self, action):
     # Repeat action 4 times, max pool over last 2 frames
-    frame_buffer = np.zeros((2, *FULL_SHAPE))
-    full_color_frame_buffer = np.zeros((2, *FULL_SHAPE, 3))
+    # frame_buffer = np.zeros((2, *FULL_FRAME_SHAPE))
+    # full_color_frame_buffer = np.zeros((2, *FULL_FRAME_SHAPE, 3))
+    frame_buffer = torch.zeros((2, *FULL_FRAME_SHAPE), device=self.device)
+    full_color_frame_buffer = torch.zeros((2, *FULL_FRAME_SHAPE, 3), device=self.device)
     reward, done = 0, False
     for t in range(4):
       reward += self.ale.act(self.actions.get(action))
       if t >= 2:
-        frame_buffer[t - 2] = self.ale.getScreenGrayscale().squeeze()
-        full_color_frame_buffer[t - 2] = self.ale.getScreenRGB()
+        frame_buffer[t - 2] = self._to_tensor(self.ale.getScreenGrayscale().squeeze())
+        full_color_frame_buffer[t - 2] = self._to_tensor(self.ale.getScreenRGB())
       done = self.ale.game_over()
       if done:
         break
 
-    observation = frame_buffer.max(0)
-    indices = frame_buffer.argmax(0)
-    # resized_indices = indices.unsqueeze(0).unsqueeze(3)
-    # resized_shape = list(resized_indices.shape)
-    # resized_shape[3] = 3
-    # full_color_observation = torch.squeeze(torch.gather(torch.tensor(full_color_frame_buffer, dtype=torch.float32),
-    #                                                     0, resized_indices.expand(*resized_shape)))
-    full_color_observation = full_color_frame_buffer[indices, np.arange(FULL_SHAPE[0])[:, None], np.arange(FULL_SHAPE[1])]
-    # TODO: avoid the call to .numpy() here if I rewrite the masker to be native in torch
+    # observation = frame_buffer.max(0)
+    # indices = frame_buffer.argmax(0)
+    observation, indices  = frame_buffer.max(0)
+    resized_indices = indices.unsqueeze(0).unsqueeze(3)
+    resized_shape = list(resized_indices.shape)
+    resized_shape[3] = 3
+    full_color_observation = torch.squeeze(torch.gather(torch.tensor(full_color_frame_buffer, dtype=torch.float32),
+                                                        0, resized_indices.expand(*resized_shape)))
+    # full_color_observation = full_color_frame_buffer[indices, np.arange(FULL_FRAME_SHAPE[0])[:, None], np.arange(FULL_FRAME_SHAPE[1])]
+
     state = self._prepare_state(observation, full_color_observation)
     self.state_buffer.append(state)
     # Detect loss of life as terminal in training mode
@@ -102,7 +109,6 @@ class Env():
         done = True
       self.lives = lives
     # Return state, reward, done
-    # TODO: to torch and correct device
     return torch.cat(list(self.state_buffer), 0), reward, done
 
   # Uses loss of life as terminal signal
@@ -134,17 +140,30 @@ class MaskerEnv(Env):
             for masker in self.maskers]
 
 
+class TorchMaskerEnv(Env):
+  def __init__(self, args, masker):
+    super(TorchMaskerEnv, self).__init__(args)
+    self.masker = masker
+
+  def _augment_state(self, full_color_state):
+    return self.masker(full_color_state)
+
+
 def make_env(args):
   args.state_depth = 1
 
   if args.add_masks:
     if args.maskers is None:
-      maskers = list(ALL_MASKERS.values())
+      masker_defs = list(ALL_MASKERS.values())
     else:
-      maskers = [ALL_MASKERS[name.strip().lower()] for name in args.maskers.split(',')]
+      masker_defs = [ALL_MASKERS[name.strip().lower()] for name in args.maskers.split(',')]
 
-    args.state_depth += len(maskers)
-    return MaskerEnv(args, maskers)
+    args.state_depth += len(masker_defs)
+
+    if args.use_numpy_masker:
+      return MaskerEnv(args, [ColorFilterMasker(masker_def) for masker_def in masker_defs])
+    else:
+      return TorchMaskerEnv(args, TorchMasker(masker_defs))
 
   else:
     return Env(args)

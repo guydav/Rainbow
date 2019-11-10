@@ -79,6 +79,7 @@ parser.add_argument('--memory-save-folder', default=DEFAULT_MEMORY_SAVE_FOLDER)
 # Arguments for the augmented representations
 parser.add_argument('--add-masks', action='store_true')
 parser.add_argument('--maskers', default=None)
+parser.add_argument('--use-numpy-masker', action='store_true')
 
 # Setup
 args = parser.parse_args()
