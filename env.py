@@ -41,7 +41,7 @@ class Env():
       self.state_buffer.append(torch.zeros(self.state_depth, *SMALL_FRAME_SHAPE, device=self.device))
 
   def _prepare_state(self, observation, full_color_state):
-    observation = observation.div_(255)
+    observation = self._resize(observation).div_(255)
     augmentation = self._augment_state(full_color_state)
 
     if isinstance(augmentation, torch.Tensor):
@@ -146,7 +146,7 @@ class TorchMaskerEnv(Env):
     self.masker = masker
 
   def _augment_state(self, full_color_state):
-    return self.masker(full_color_state)
+    return self._resize(self.masker(full_color_state))
 
 
 def make_env(args):

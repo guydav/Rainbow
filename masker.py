@@ -91,7 +91,8 @@ class TorchMasker:
         for masker in self.masker_definitions:
             all_colors.extend(masker.filter_colors)
 
-        self.all_colors = torch.stack([torch.tensor(color, dtype=torch.uint8, device=device).view(1, 1, 3).repeat(*FULL_FRAME_SHAPE, 1)
+        # TODO: profile torch.uint8 here vs. converting to float later
+        self.all_colors = torch.stack([torch.tensor(color, dtype=torch.float, device=device).view(1, 1, 3).repeat(*FULL_FRAME_SHAPE, 1)
                                        for color in all_colors])
         self.category_lengths = [len(masker.filter_colors) for masker in self.masker_definitions]
 
