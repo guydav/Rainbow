@@ -29,7 +29,8 @@ class Env():
 
   def _resize(self, frame):
     if isinstance(frame, torch.Tensor):
-      return torch.nn.functional.interpolate(frame.view(1, *frame.shape), SMALL_FRAME_SHAPE, mode='linear')
+      # TODO: validate which mode should this be
+      return torch.nn.functional.interpolate(frame.view(1, *frame.shape), SMALL_FRAME_SHAPE, mode='bilinear')
     else:
       return cv2.resize(frame, SMALL_FRAME_SHAPE, interpolation=cv2.INTER_LINEAR)
 
