@@ -98,7 +98,7 @@ class TorchMasker:
 
     def __call__(self, frame):
         all_mask_results = torch.eq(frame.view(1, *frame.shape), self.all_colors).all(dim=3)
-        category_masks = torch.zeros(len(self.masker_definitions, *FULL_FRAME_SHAPE))
+        category_masks = torch.zeros(len(self.masker_definitions), *FULL_FRAME_SHAPE)
 
         current_index = 0
         for i, length in enumerate(self.category_lengths):

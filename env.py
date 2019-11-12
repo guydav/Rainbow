@@ -30,7 +30,7 @@ class Env():
   def _resize(self, frame):
     if isinstance(frame, torch.Tensor):
       # TODO: validate which mode should this be
-      return torch.nn.functional.interpolate(frame.view(1, *frame.shape), SMALL_FRAME_SHAPE, mode='bilinear')
+      return torch.nn.functional.interpolate(frame, SMALL_FRAME_SHAPE, mode='bilinear')
     else:
       return cv2.resize(frame, SMALL_FRAME_SHAPE, interpolation=cv2.INTER_LINEAR)
 
@@ -42,13 +42,13 @@ class Env():
       self.state_buffer.append(torch.zeros(self.state_depth, *SMALL_FRAME_SHAPE, device=self.device))
 
   def _prepare_state(self, observation, full_color_state):
-    observation = self._resize(observation).div_(255)
+    observation = self._resize(observation.unsqueeze(0)).div_(255)
     augmentation = self._augment_state(full_color_state)
 
     if isinstance(augmentation, torch.Tensor):
-      return torch.cat((observation.view(-1, *observation.shape), augmentation))
+      return torch.cat((observation, augmentation))
     else:
-      return torch.stack((observation, *augmentation))
+      return torch.stack((observation.squeeze(), *augmentation))
 
   def _augment_state(self, full_color_state):
     return list()
@@ -92,7 +92,7 @@ class Env():
 
     # observation = frame_buffer.max(0)
     # indices = frame_buffer.argmax(0)
-    observation, indices  = frame_buffer.max(0)
+    observation, indices = frame_buffer.max(0)
     resized_indices = indices.unsqueeze(0).unsqueeze(3)
     resized_shape = list(resized_indices.shape)
     resized_shape[3] = 3
