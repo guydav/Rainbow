@@ -91,14 +91,13 @@ class TorchMasker:
         for masker in self.masker_definitions:
             all_colors.extend(masker.filter_colors)
 
-        # TODO: profile torch.uint8 here vs. converting to float later
         self.all_colors = torch.stack([torch.tensor(color, dtype=torch.float, device=device).view(1, 1, 3).repeat(*FULL_FRAME_SHAPE, 1)
                                        for color in all_colors])
         self.category_lengths = [len(masker.filter_colors) for masker in self.masker_definitions]
 
     def __call__(self, frame):
         all_mask_results = torch.eq(frame.view(1, *frame.shape), self.all_colors).all(dim=3)
-        category_masks = torch.zeros(len(self.masker_definitions), *FULL_FRAME_SHAPE)
+        category_masks = torch.zeros(len(self.masker_definitions), *FULL_FRAME_SHAPE, device=self.device)
 
         current_index = 0
         for i, length in enumerate(self.category_lengths):
@@ -107,7 +106,9 @@ class TorchMasker:
                 current_index += length
             else:
                 category_masks[i:] = all_mask_results[current_index:]
+                break
 
+         # TODO: try to optimize this by pre-computing flat indices, as this takes about half the time
         for i, masker_def in enumerate(self.masker_definitions):
             if masker_def.range_whitelist:
                 category_masks[i, :masker_def.row_range[0], :] = 0
@@ -120,6 +121,50 @@ class TorchMasker:
                                masker_def.col_range[0]:masker_def.col_range[1]] = 0
 
         return category_masks
+    
+# Below natively with uint8s -- it seems almost identical, perhaps a second slower over 20k steps
+"""
+class TorchMasker:
+    def __init__(self, masker_definitions, device):
+        self.masker_definitions = sorted(list(masker_definitions), key=lambda md: len(md.filter_colors), reverse=True)
+        self.device = device
+
+        all_colors = []
+        for masker in self.masker_definitions:
+            all_colors.extend(masker.filter_colors)
+
+        # TODO: profile torch.uint8 here vs. converting to float later
+        # self.all_colors = torch.stack([torch.tensor(color, dtype=torch.float, device=device).view(1, 1, 3).repeat(*FULL_FRAME_SHAPE, 1)
+        self.all_colors = torch.stack([torch.tensor(color, dtype=torch.uint8, device=device).view(1, 1, 3).repeat(*FULL_FRAME_SHAPE, 1)
+                                       for color in all_colors])
+        self.category_lengths = [len(masker.filter_colors) for masker in self.masker_definitions]
+
+    def __call__(self, frame):
+        all_mask_results = torch.eq(frame.view(1, *frame.shape).type(torch.uint8), self.all_colors).all(dim=3)
+        category_masks = torch.zeros(len(self.masker_definitions), *FULL_FRAME_SHAPE, device=self.device, dtype=torch.uint8)
+
+        current_index = 0
+        for i, length in enumerate(self.category_lengths):
+            if length > 1:
+                category_masks[i] = all_mask_results[current_index: current_index + length].any(dim=0)
+                current_index += length
+            else:
+                category_masks[i:] = all_mask_results[current_index:]
+                break
+
+        for i, masker_def in enumerate(self.masker_definitions):
+            if masker_def.range_whitelist:
+                category_masks[i, :masker_def.row_range[0], :] = 0
+                category_masks[i, masker_def.row_range[1]:, :] = 0
+                category_masks[i, :, :masker_def.col_range[0]] = 0
+                category_masks[i, :, masker_def.col_range[1]:] = 0
+
+            else:
+                category_masks[i, masker_def.row_range[0]:masker_def.row_range[1],
+                               masker_def.col_range[0]:masker_def.col_range[1]] = 0
+
+        return category_masks.float()
+"""
 
 
 # player_masker = ColorFilterMasker(player_colors, igloo_full_frame_row_range,

@@ -42,11 +42,12 @@ class Env():
       self.state_buffer.append(torch.zeros(self.state_depth, *SMALL_FRAME_SHAPE, device=self.device))
 
   def _prepare_state(self, observation, full_color_state):
-    observation = self._resize(observation.unsqueeze(0)).div_(255)
+    observation = self._resize(observation.view(1, 1, *observation.shape)).div_(255)
     augmentation = self._augment_state(full_color_state)
 
     if isinstance(augmentation, torch.Tensor):
-      return torch.cat((observation, augmentation))
+#       return torch.cat((observation, augmentation), dim=1).squeeze(0)  # dim=1 to allow for the empty "batch" dimension at 0
+      return torch.cat((observation.squeeze(0), augmentation.squeeze(0)))  # dim=1 to allow for the empty "batch" dimension at 0
     else:
       return torch.stack((observation.squeeze(), *augmentation))
 
@@ -67,7 +68,7 @@ class Env():
         if self.ale.game_over():
           self.ale.reset_game()
     # Process and return "initial" state
-    state = self._prepare_state(self._to_tensor(self.ale.getScreenGrayscale()),
+    state = self._prepare_state(self._to_tensor(self.ale.getScreenGrayscale().squeeze()),
                                 self._to_tensor(self.ale.getScreenRGB()))
 
     self.state_buffer.append(state)
@@ -96,7 +97,7 @@ class Env():
     resized_indices = indices.unsqueeze(0).unsqueeze(3)
     resized_shape = list(resized_indices.shape)
     resized_shape[3] = 3
-    full_color_observation = torch.squeeze(torch.gather(torch.tensor(full_color_frame_buffer, dtype=torch.float32),
+    full_color_observation = torch.squeeze(torch.gather(full_color_frame_buffer,
                                                         0, resized_indices.expand(*resized_shape)))
     # full_color_observation = full_color_frame_buffer[indices, np.arange(FULL_FRAME_SHAPE[0])[:, None], np.arange(FULL_FRAME_SHAPE[1])]
 
@@ -147,7 +148,7 @@ class TorchMaskerEnv(Env):
     self.masker = masker
 
   def _augment_state(self, full_color_state):
-    return self._resize(self.masker(full_color_state))
+    return self._resize(self.masker(full_color_state).unsqueeze(0))
 
 
 def make_env(args):
