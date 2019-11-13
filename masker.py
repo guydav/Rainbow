@@ -95,6 +95,48 @@ class TorchMasker:
                                        for color in all_colors])
         self.category_lengths = [len(masker.filter_colors) for masker in self.masker_definitions]
 
+        # channel_flattened_length = np.prod(FULL_FRAME_SHAPE)
+        # num_rows = FULL_FRAME_SHAPE[0]
+        # num_cols = row_length = FULL_FRAME_SHAPE[1]
+        # self.zero_mask = torch.zeros(len(self.masker_definitions) * channel_flattened_length, dtype=torch.long)
+        # for chanel_index, masker_def in enumerate(self.masker_definitions):
+        #     channel_offset = channel_flattened_length * chanel_index
+        #     if masker_def.range_whitelist:
+        #         start_row_indices = channel_offset + \
+        #                             (torch.arange(masker_def.row_range[0]).view(-1, 1) * row_length) + \
+        #                             torch.arange(num_cols).expand(masker_def.row_range[0], -1)
+        #         self.zero_mask[start_row_indices.view(-1)] = 1
+        #         end_row_indices = channel_offset + \
+        #                           (torch.arange(masker_def.row_range[1], num_rows).view(-1, 1) * row_length) + \
+        #                           torch.arange(num_cols).expand(num_rows - masker_def.row_range[1], -1)
+        #         self.zero_mask[end_row_indices.view(-1)] = 1
+        #         start_col_indices = channel_offset + \
+        #                             torch.arange(masker_def.col_range[0]).view(-1, 1) + \
+        #                             (torch.arange(num_rows).expand(masker_def.col_range[0], -1) * row_length)
+        #         self.zero_mask[start_col_indices.view(-1)] = 1
+        #         end_col_indices = channel_offset + \
+        #                           torch.arange(masker_def.col_range[1], num_cols).view(-1, 1) + \
+        #                           (torch.arange(num_rows).expand(num_cols - masker_def.col_range[1], -1) * row_length)
+        #         self.zero_mask[end_col_indices] = 1
+        # 
+        #     else:
+        #         combined_indices = channel_offset + \
+        #                            (torch.arange(masker_def.row_range[0], masker_def.row_range[1]).view(-1, 1) * row_length) + \
+        #                            torch.arange(masker_def.col_range[0], masker_def.col_range[1]).expand(masker_def.row_range[1] - masker_def.row_range[0], -1)
+        #         self.zero_mask[combined_indices] = 1
+        
+        self.zero_mask = torch.ones(len(self.masker_definitions), *FULL_FRAME_SHAPE, device=self.device)
+        for i, masker_def in enumerate(self.masker_definitions):
+            if masker_def.range_whitelist:
+                self.zero_mask[i, :masker_def.row_range[0], :] = 0
+                self.zero_mask[i, masker_def.row_range[1]:, :] = 0
+                self.zero_mask[i, :, :masker_def.col_range[0]] = 0
+                self.zero_mask[i, :, masker_def.col_range[1]:] = 0
+
+            else:
+                self.zero_mask[i, masker_def.row_range[0]:masker_def.row_range[1],
+                               masker_def.col_range[0]:masker_def.col_range[1]] = 0
+
     def __call__(self, frame):
         all_mask_results = torch.eq(frame.view(1, *frame.shape), self.all_colors).all(dim=3)
         category_masks = torch.zeros(len(self.masker_definitions), *FULL_FRAME_SHAPE, device=self.device)
@@ -108,20 +150,9 @@ class TorchMasker:
                 category_masks[i:] = all_mask_results[current_index:]
                 break
 
-         # TODO: try to optimize this by pre-computing flat indices, as this takes about half the time
-        for i, masker_def in enumerate(self.masker_definitions):
-            if masker_def.range_whitelist:
-                category_masks[i, :masker_def.row_range[0], :] = 0
-                category_masks[i, masker_def.row_range[1]:, :] = 0
-                category_masks[i, :, :masker_def.col_range[0]] = 0
-                category_masks[i, :, masker_def.col_range[1]:] = 0
+        category_masks.mul_(self.zero_mask)
 
-            else:
-                category_masks[i, masker_def.row_range[0]:masker_def.row_range[1],
-                               masker_def.col_range[0]:masker_def.col_range[1]] = 0
-
-        return category_masks
-    
+        return category_masks    
 # Below natively with uint8s -- it seems almost identical, perhaps a second slower over 20k steps
 """
 class TorchMasker:
