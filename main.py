@@ -81,6 +81,7 @@ parser.add_argument('--maskers', default=None)
 parser.add_argument('--use-numpy-masker', action='store_true')
 parser.add_argument('--debug-heap', action='store_true')
 parser.add_argument('--heap-interval', default=1e5)
+parser.add_argument('--heap-debug-file', default=None)
 
 # Setup
 args = parser.parse_args()
@@ -265,8 +266,17 @@ os.makedirs(memory_save_folder, exist_ok=True)
 
 
 # Simple ISO 8601 timestamped logger
+def log_message(s):
+  return f'[{str(datetime.now().strftime("%Y-%m-%dT%H:%M:%S"))}]: {s}'
+
+
 def log(s):
-  print('[' + str(datetime.now().strftime('%Y-%m-%dT%H:%M:%S')) + '] ' + s)
+  print(log_message(s))
+
+
+def log_to_file(path, s):
+  with open(path, 'a') as log_file:
+    log_file.write(f'{log_message(s)}\n')
 
 
 # Augmented representations and Environments
@@ -303,6 +313,10 @@ if args.debug_heap:
   heap = hpy()
   heap.setref()
 
+  heap_debug_path = args.heap_debug_file
+  if heap_debug_path is None:
+    heap_debug_path = os.path.join(results_dir, 'heap_debug.log')
+
 if args.evaluate:
   dqn.eval()  # Set DQN (online network) to evaluation mode
   avg_reward, avg_Q = test(args, T_start, dqn, val_mem, metrics, results_dir, evaluate=True)  # Test
@@ -333,8 +347,8 @@ else:
         dqn.learn(mem)  # Train with n-step distributional double-Q learning
 
       if args.debug_heap and T % args.heap_interval == 0:
-        print('Heap after training and replay:')
-        print(heap.heap())
+        log_to_file(heap_debug_path, 'Heap after training and replay:')
+        log_to_file(heap_debug_path, heap.heap())
         heap.setref()
 
       if T % args.evaluation_interval == 0:
@@ -347,8 +361,8 @@ else:
         save_memory(mem, T)
 
       if args.debug_heap and T % args.heap_interval == 0:
-        print('Heap after testing:')
-        print(heap.heap())
+        log_to_file(heap_debug_path, 'Heap after testing:')
+        log_to_file(heap_debug_path, heap.heap())
         heap.setref()
 
       # Update target network
