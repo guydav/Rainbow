@@ -80,7 +80,7 @@ parser.add_argument('--add-masks', action='store_true')
 parser.add_argument('--maskers', default=None)
 parser.add_argument('--use-numpy-masker', action='store_true')
 parser.add_argument('--debug-heap', action='store_true')
-parser.add_argument('--heap-interval', default=1e5)
+parser.add_argument('--heap-interval', default=1e4)
 parser.add_argument('--heap-debug-file', default=None)
 
 # Setup
