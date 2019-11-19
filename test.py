@@ -15,7 +15,7 @@ from env import make_env
 
 
 # Test DQN
-@profile(immediate=True)
+# @profile(immediate=True)
 def test(args, T, dqn, val_mem, metrics, results_dir, evaluate=False):
   env = make_env(args)
   env.eval()
