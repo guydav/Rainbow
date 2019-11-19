@@ -13,13 +13,12 @@ import numpy as np
 import torch
 from tqdm import tqdm, trange
 import wandb
+from guppy import hpy
 
 from agent import Agent
 from env import make_env
 from memory import ReplayMemory
 from test import test
-from masker import ALL_MASKERS
-
 
 
 # Note that hyperparameters may originally be reported in ATARI game frames instead of agent steps
@@ -80,6 +79,8 @@ parser.add_argument('--memory-save-folder', default=DEFAULT_MEMORY_SAVE_FOLDER)
 parser.add_argument('--add-masks', action='store_true')
 parser.add_argument('--maskers', default=None)
 parser.add_argument('--use-numpy-masker', action='store_true')
+parser.add_argument('--debug-heap', action='store_true')
+parser.add_argument('--heap-interval', default=1e5)
 
 # Setup
 args = parser.parse_args()
@@ -298,6 +299,9 @@ if args.wandb_resume and T_resume is not None:
   T_start = T_resume
   mem = loaded_replay_memory
 
+if args.debug_heap:
+  heap = hpy()
+  heap.setref()
 
 if args.evaluate:
   dqn.eval()  # Set DQN (online network) to evaluation mode
@@ -328,6 +332,11 @@ else:
       if T % args.replay_frequency == 0:
         dqn.learn(mem)  # Train with n-step distributional double-Q learning
 
+      if args.debug_heap and T % args.heap_interval == 0:
+        print('Heap after training and replay:')
+        print(heap.heap())
+        heap.setref()
+
       if T % args.evaluation_interval == 0:
         dqn.eval()  # Set DQN (online network) to evaluation mode
         avg_reward, avg_Q = test(args, T, dqn, val_mem, metrics, results_dir)  # Test
@@ -336,6 +345,11 @@ else:
 
         dqn.save(wandb.run.dir, f'{wandb_name}-{T}.pth')
         save_memory(mem, T)
+
+      if args.debug_heap and T % args.heap_interval == 0:
+        print('Heap after testing:')
+        print(heap.heap())
+        heap.setref()
 
       # Update target network
       if T % args.target_update == 0:
