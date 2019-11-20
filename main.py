@@ -4,6 +4,7 @@ import argparse
 import bz2
 from datetime import datetime
 import os
+import psutil
 import pickle
 import shutil
 import time
@@ -310,6 +311,7 @@ if args.wandb_resume and T_resume is not None:
   mem = loaded_replay_memory
 
 if args.debug_heap:
+  process = psutil.Process()
   heap = hpy()
   heap.setref()
 
@@ -347,7 +349,13 @@ else:
         dqn.learn(mem)  # Train with n-step distributional double-Q learning
 
       if args.debug_heap and T % args.heap_interval == 0:
-        log_to_file(heap_debug_path, 'Heap after training and replay:')
+        log_to_file(heap_debug_path, f'After {T} steps:')
+        log_to_file(heap_debug_path,
+                    f'CUDA memory allocated after training: {torch.cuda.memory_allocated(args.device)} bytes.')
+        log_to_file(heap_debug_path,
+                    f'CUDA memory cached after training: {torch.cuda.memory_cached(args.device)} bytes.')
+        log_to_file(heap_debug_path, f'OS-level memory usage: {process.memory_info().rss} bytes.')
+        log_to_file(heap_debug_path, 'Heap after training:')
         log_to_file(heap_debug_path, heap.heap())
         heap.setref()
 
@@ -360,10 +368,16 @@ else:
         dqn.save(wandb.run.dir, f'{wandb_name}-{T}.pth')
         save_memory(mem, T)
 
-      if args.debug_heap and T % args.heap_interval == 0:
-        log_to_file(heap_debug_path, 'Heap after testing:')
-        log_to_file(heap_debug_path, heap.heap())
-        heap.setref()
+        if args.debug_heap and T % args.heap_interval == 0:
+          log_to_file(heap_debug_path, f'After {T} steps:')
+          log_to_file(heap_debug_path,
+                      f'CUDA memory allocated after testing: {torch.cuda.memory_allocated(args.device)} bytes.')
+          log_to_file(heap_debug_path,
+                      f'CUDA memory cached after testing: {torch.cuda.memory_cached(args.device)} bytes.')
+          log_to_file(heap_debug_path, f'OS-level memory usage: {process.memory_info().rss} bytes.')
+          log_to_file(heap_debug_path, 'Heap after testing:')
+          log_to_file(heap_debug_path, heap.heap())
+          heap.setref()
 
       # Update target network
       if T % args.target_update == 0:
