@@ -364,6 +364,7 @@ else:
         heap.setref()
 
       if T % args.evaluation_interval == 0:
+        log(f'Starting to test at T = {T}')
         dqn.eval()  # Set DQN (online network) to evaluation mode
         avg_reward, avg_Q = test(args, T, dqn, val_mem, metrics, results_dir)  # Test
         log('T = ' + str(T) + ' / ' + str(args.T_max) + ' | Avg. reward: ' + str(avg_reward) + ' | Avg. Q: ' + str(avg_Q))
@@ -384,17 +385,22 @@ else:
           log_to_file(heap_debug_path, heap.heap())
           heap.setref()
 
+        log('Before model save')
+
         dqn.save(wandb.run.dir, f'{wandb_name}-{T}.pth')
         if args.debug_heap and T % args.heap_interval == 0:
           process_mem = process.memory_info().rss
           log_to_file(heap_debug_path,
                       f'OS-level memory usage after saving model: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
 
+        log('Before memory save')
         save_memory(mem, T)
         if args.debug_heap and T % args.heap_interval == 0:
           process_mem = process.memory_info().rss
           log_to_file(heap_debug_path,
                       f'OS-level memory usage after saving memory: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
+
+        log('After both saves')
 
       # Update target network
       if T % args.target_update == 0:
