@@ -350,11 +350,14 @@ else:
 
       if args.debug_heap and T % args.heap_interval == 0:
         log_to_file(heap_debug_path, f'After {T} steps:')
+        allocated = torch.cuda.memory_allocated(args.device)
         log_to_file(heap_debug_path,
-                    f'CUDA memory allocated after training: {torch.cuda.memory_allocated(args.device)} bytes.')
+                    f'CUDA memory allocated after training: {allocated} bytes = {allocated / 1024.0 / 1024:.3f} MB.')
+        cached = torch.cuda.memory_cached(args.device)
         log_to_file(heap_debug_path,
-                    f'CUDA memory cached after training: {torch.cuda.memory_cached(args.device)} bytes.')
-        log_to_file(heap_debug_path, f'OS-level memory usage: {process.memory_info().rss} bytes.')
+                    f'CUDA memory cached after training: {cached} bytes = {cached / 1024.0 / 1024:.3f} MB.')
+        process_mem = process.memory_info().rss
+        log_to_file(heap_debug_path, f'OS-level memory usage after training: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
         log_to_file(heap_debug_path, 'Heap after training:')
         log_to_file(heap_debug_path, heap.heap())
         heap.setref()
@@ -370,11 +373,15 @@ else:
 
         if args.debug_heap and T % args.heap_interval == 0:
           log_to_file(heap_debug_path, f'After {T} steps:')
+          allocated = torch.cuda.memory_allocated(args.device)
           log_to_file(heap_debug_path,
-                      f'CUDA memory allocated after testing: {torch.cuda.memory_allocated(args.device)} bytes.')
+                      f'CUDA memory allocated after testing: {allocated} bytes = {allocated / 1024.0 / 1024:.3f} MB.')
+          cached = torch.cuda.memory_cached(args.device)
           log_to_file(heap_debug_path,
-                      f'CUDA memory cached after testing: {torch.cuda.memory_cached(args.device)} bytes.')
-          log_to_file(heap_debug_path, f'OS-level memory usage: {process.memory_info().rss} bytes.')
+                      f'CUDA memory cached after testing: {cached} bytes = {cached / 1024.0 / 1024:.3f} MB.')
+          process_mem = process.memory_info().rss
+          log_to_file(heap_debug_path,
+                      f'OS-level memory usage after testing: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
           log_to_file(heap_debug_path, 'Heap after testing:')
           log_to_file(heap_debug_path, heap.heap())
           heap.setref()
