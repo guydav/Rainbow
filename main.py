@@ -349,13 +349,14 @@ else:
         dqn.learn(mem)  # Train with n-step distributional double-Q learning
 
       if args.debug_heap and T % args.heap_interval == 0:
-        log_to_file(heap_debug_path, f'After {T} steps:')
-        allocated = torch.cuda.memory_allocated(args.device)
-        log_to_file(heap_debug_path,
-                    f'CUDA memory allocated after training: {allocated} bytes = {allocated / 1024.0 / 1024:.3f} MB.')
-        cached = torch.cuda.memory_cached(args.device)
-        log_to_file(heap_debug_path,
-                    f'CUDA memory cached after training: {cached} bytes = {cached / 1024.0 / 1024:.3f} MB.')
+        replay_size = mem.capacity if mem.transitions.full else mem.transitions.index
+        log_to_file(heap_debug_path, f'After {T} steps, replay buffer size is {replay_size}:')
+        # allocated = torch.cuda.memory_allocated(args.device)
+        # log_to_file(heap_debug_path,
+        #             f'CUDA memory allocated after training: {allocated} bytes = {allocated / 1024.0 / 1024:.3f} MB.')
+        # cached = torch.cuda.memory_cached(args.device)
+        # log_to_file(heap_debug_path,
+        #             f'CUDA memory cached after training: {cached} bytes = {cached / 1024.0 / 1024:.3f} MB.')
         process_mem = process.memory_info().rss
         log_to_file(heap_debug_path, f'OS-level memory usage after training: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
         log_to_file(heap_debug_path, 'Heap after training:')
@@ -368,23 +369,32 @@ else:
         log('T = ' + str(T) + ' / ' + str(args.T_max) + ' | Avg. reward: ' + str(avg_reward) + ' | Avg. Q: ' + str(avg_Q))
         dqn.train()  # Set DQN (online network) back to training mode
 
-        dqn.save(wandb.run.dir, f'{wandb_name}-{T}.pth')
-        save_memory(mem, T)
-
         if args.debug_heap and T % args.heap_interval == 0:
           log_to_file(heap_debug_path, f'After {T} steps:')
-          allocated = torch.cuda.memory_allocated(args.device)
-          log_to_file(heap_debug_path,
-                      f'CUDA memory allocated after testing: {allocated} bytes = {allocated / 1024.0 / 1024:.3f} MB.')
-          cached = torch.cuda.memory_cached(args.device)
-          log_to_file(heap_debug_path,
-                      f'CUDA memory cached after testing: {cached} bytes = {cached / 1024.0 / 1024:.3f} MB.')
+          # allocated = torch.cuda.memory_allocated(args.device)
+          # log_to_file(heap_debug_path,
+          #             f'CUDA memory allocated after testing: {allocated} bytes = {allocated / 1024.0 / 1024:.3f} MB.')
+          # cached = torch.cuda.memory_cached(args.device)
+          # log_to_file(heap_debug_path,
+          #             f'CUDA memory cached after testing: {cached} bytes = {cached / 1024.0 / 1024:.3f} MB.')
           process_mem = process.memory_info().rss
           log_to_file(heap_debug_path,
                       f'OS-level memory usage after testing: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
           log_to_file(heap_debug_path, 'Heap after testing:')
           log_to_file(heap_debug_path, heap.heap())
           heap.setref()
+
+        dqn.save(wandb.run.dir, f'{wandb_name}-{T}.pth')
+        if args.debug_heap and T % args.heap_interval == 0:
+          process_mem = process.memory_info().rss
+          log_to_file(heap_debug_path,
+                      f'OS-level memory usage after saving model: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
+
+        save_memory(mem, T)
+        if args.debug_heap and T % args.heap_interval == 0:
+          process_mem = process.memory_info().rss
+          log_to_file(heap_debug_path,
+                      f'OS-level memory usage after saving memory: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
 
       # Update target network
       if T % args.target_update == 0:
