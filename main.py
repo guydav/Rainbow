@@ -182,7 +182,6 @@ def save_memory(memory, T_reached, use_native_pickle_serialization=False):
     if use_native_pickle_serialization:
       pickle.dump(memory, zipped_pickle_file, protocol=pickle.HIGHEST_PROTOCOL)
     else:
-      log_to_file(heap_debug_path, 'In the torch.save() branch')
       torch.save(memory, zipped_pickle_file, pickle_protocol=pickle.HIGHEST_PROTOCOL)
 
   process_mem = process.memory_info().rss
@@ -378,15 +377,16 @@ else:
 
       if args.debug_heap and T % args.heap_interval == 0:
         replay_size = mem.capacity if mem.transitions.full else mem.transitions.index
-        log_to_file(heap_debug_path, f'After {T} steps, replay buffer size is {replay_size}:')
+        process_mem = process.memory_info().rss
+        log_to_file(heap_debug_path, f'After {T} steps, replay buffer size is {replay_size}, {process_mem / 1024.0 / replay_size} KB/transition')
+        log_to_file(heap_debug_path,
+                    f'OS-level memory usage after training: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
         # allocated = torch.cuda.memory_allocated(args.device)
         # log_to_file(heap_debug_path,
         #             f'CUDA memory allocated after training: {allocated} bytes = {allocated / 1024.0 / 1024:.3f} MB.')
         # cached = torch.cuda.memory_cached(args.device)
         # log_to_file(heap_debug_path,
         #             f'CUDA memory cached after training: {cached} bytes = {cached / 1024.0 / 1024:.3f} MB.')
-        process_mem = process.memory_info().rss
-        log_to_file(heap_debug_path, f'OS-level memory usage after training: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
         # log_to_file(heap_debug_path, 'Heap after training:')
         # log_to_file(heap_debug_path, heap.heap())
         # heap.setref()
