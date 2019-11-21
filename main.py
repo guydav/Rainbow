@@ -172,19 +172,36 @@ def load_memory(use_bz2=True, use_native_pickle_serialization=False):
 
 @timeit
 def save_memory(memory, T_reached, use_native_pickle_serialization=False):
-  global replay_memory_pickle_bz2, replay_memory_pickle_bz2_temp, replay_memory_T_reached
+  global replay_memory_pickle_bz2, replay_memory_pickle_bz2_temp, replay_memory_T_reached, heap_debug_path, process
 
   with bz2.open(get_memory_file_path(replay_memory_pickle_bz2_temp), 'wb') as zipped_pickle_file:
+    process_mem = process.memory_info().rss
+    log_to_file(heap_debug_path,
+                f'OS-level memory usage after file open: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
+
     if use_native_pickle_serialization:
       pickle.dump(memory, zipped_pickle_file, protocol=pickle.HIGHEST_PROTOCOL)
     else:
+      log_to_file(heap_debug_path, 'In the torch.save() branch')
       torch.save(memory, zipped_pickle_file, pickle_protocol=pickle.HIGHEST_PROTOCOL)
+
+  process_mem = process.memory_info().rss
+  log_to_file(heap_debug_path,
+              f'OS-level memory usage after save, before move: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
 
   # Switch to copying and moving separately to mitigate the effect of instant shutdown while writing
   shutil.move(get_memory_file_path(replay_memory_pickle_bz2_temp), get_memory_file_path(replay_memory_pickle_bz2))
 
+  process_mem = process.memory_info().rss
+  log_to_file(heap_debug_path,
+              f'OS-level memory usage after move: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
+
   with open(get_memory_file_path(replay_memory_T_reached), 'w') as memory_T_file:
     memory_T_file.write(str(T_reached))
+
+  process_mem = process.memory_info().rss
+  log_to_file(heap_debug_path,
+              f'OS-level memory usage after T-reached file: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
 
 
 # Set up wandb
