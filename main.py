@@ -75,6 +75,7 @@ parser.add_argument('--wandb-omit-watch', action='store_true')
 parser.add_argument('--wandb-resume', action='store_true')
 DEFAULT_MEMORY_SAVE_FOLDER = os.path.join(SCRATCH_FOLDER, 'rainbow_memory')
 parser.add_argument('--memory-save-folder', default=DEFAULT_MEMORY_SAVE_FOLDER)
+parser.add_argument('--use-native-pickle-serialization', action='store_true', help='Use native pickle saving rather than torch.save()')
 
 # Arguments for the augmented representations
 parser.add_argument('--add-masks', action='store_true')
@@ -150,26 +151,34 @@ def get_memory_file_path(name, folder=memory_save_folder):
 
 
 @timeit
-def load_memory(use_bz2=True):
+def load_memory(use_bz2=True, use_native_pickle_serialization=False):
   global replay_memory_pickle_bz2, replay_memory_pickle
 
-  if use_bz2:
-    with bz2.open(get_memory_file_path(replay_memory_pickle_bz2), 'rb') as zipped_pickle_file:
-      return pickle.load(zipped_pickle_file)
+  if use_native_pickle_serialization:
+    if use_bz2:
+      with bz2.open(get_memory_file_path(replay_memory_pickle_bz2), 'rb') as zipped_pickle_file:
+        return pickle.load(zipped_pickle_file)
+
+    else:
+      with open(get_memory_file_path(replay_memory_pickle), 'rb') as regular_pickle_file:
+        return pickle.load(regular_pickle_file)
 
   else:
-    with open(get_memory_file_path(replay_memory_pickle), 'rb') as regular_pickle_file:
-      return pickle.load(regular_pickle_file)
+    # Torch load came after bz2, so assumed
+    with bz2.open(get_memory_file_path(replay_memory_pickle_bz2), 'rb') as zipped_pickle_file:
+      return torch.load(zipped_pickle_file)
+
 
 
 @timeit
-def save_memory(memory, T_reached):
+def save_memory(memory, T_reached, use_native_pickle_serialization=False):
   global replay_memory_pickle_bz2, replay_memory_pickle_bz2_temp, replay_memory_T_reached
 
   with bz2.open(get_memory_file_path(replay_memory_pickle_bz2_temp), 'wb') as zipped_pickle_file:
-    pickle.dump(memory, zipped_pickle_file, protocol=pickle.HIGHEST_PROTOCOL)
-
-  # TODO: benchmark/compare to using torch.load and torch.save
+    if use_native_pickle_serialization:
+      pickle.dump(memory, zipped_pickle_file, protocol=pickle.HIGHEST_PROTOCOL)
+    else:
+      torch.save(memory, zipped_pickle_file, pickle_protocol=pickle.HIGHEST_PROTOCOL)
 
   # Switch to copying and moving separately to mitigate the effect of instant shutdown while writing
   shutil.move(get_memory_file_path(replay_memory_pickle_bz2_temp), get_memory_file_path(replay_memory_pickle_bz2))
@@ -232,11 +241,11 @@ if args.wandb_resume:
       # temporary condition to handle the non-zipped, old pickle files
       if os.path.exists(get_memory_file_path(replay_memory_pickle)):
         loaded_replay_memory = load_memory(use_bz2=False)
-        save_memory(loaded_replay_memory, T_memory)
+        save_memory(loaded_replay_memory, T_memory, use_native_pickle_serialization=args.use_native_pickle_serialization)
         os.remove(get_memory_file_path(replay_memory_pickle))
 
       else:
-        loaded_replay_memory = load_memory()
+        loaded_replay_memory = load_memory(use_native_pickle_serialization=args.use_native_pickle_serialization)
 
   if original_run_id is None:
     print(f'Failed to find run to resume for seed {args.seed}, running from scratch')
@@ -396,7 +405,7 @@ else:
                       f'OS-level memory usage after saving model: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
 
         log('Before memory save')
-        save_memory(mem, T)
+        save_memory(mem, T, use_native_pickle_serialization=args.use_native_pickle_serialization)
         if args.debug_heap and T % args.heap_interval == 0:
           process_mem = process.memory_info().rss
           log_to_file(heap_debug_path,
