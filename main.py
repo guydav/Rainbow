@@ -378,7 +378,7 @@ else:
       if args.debug_heap and T % args.heap_interval == 0:
         replay_size = mem.capacity if mem.transitions.full else mem.transitions.index
         process_mem = process.memory_info().rss
-        log_to_file(heap_debug_path, f'After {T} steps, replay buffer size is {replay_size}, {process_mem / 1024.0 / replay_size} KB/transition')
+        log_to_file(heap_debug_path, f'After {T} steps, replay buffer size is {replay_size}, {process_mem / 1024.0 / replay_size:.3f} KB/transition')
         log_to_file(heap_debug_path,
                     f'OS-level memory usage after training: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
         # allocated = torch.cuda.memory_allocated(args.device)
