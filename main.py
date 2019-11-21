@@ -14,7 +14,7 @@ import numpy as np
 import torch
 from tqdm import tqdm, trange
 import wandb
-from guppy import hpy
+# from guppy import hpy
 
 from agent import Agent
 from env import make_env
