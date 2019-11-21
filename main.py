@@ -167,9 +167,11 @@ def save_memory(memory, T_reached):
   global replay_memory_pickle_bz2, replay_memory_pickle_bz2_temp, replay_memory_T_reached
 
   with bz2.open(get_memory_file_path(replay_memory_pickle_bz2_temp), 'wb') as zipped_pickle_file:
-    pickle.dump(memory, zipped_pickle_file)
+    pickle.dump(memory, zipped_pickle_file, protocol=pickle.HIGHEST_PROTOCOL)
 
-  # Switch to copying and moving separately to mitigate the effect of instane shutdown while writing
+  # TODO: benchmark/compare to using torch.load and torch.save
+
+  # Switch to copying and moving separately to mitigate the effect of instant shutdown while writing
   shutil.move(get_memory_file_path(replay_memory_pickle_bz2_temp), get_memory_file_path(replay_memory_pickle_bz2))
 
   with open(get_memory_file_path(replay_memory_T_reached), 'w') as memory_T_file:
@@ -312,8 +314,8 @@ if args.wandb_resume and T_resume is not None:
 
 if args.debug_heap:
   process = psutil.Process()
-  heap = hpy()
-  heap.setref()
+  # heap = hpy()
+  # heap.setref()
 
   heap_debug_path = args.heap_debug_file
   if heap_debug_path is None:
@@ -359,9 +361,9 @@ else:
         #             f'CUDA memory cached after training: {cached} bytes = {cached / 1024.0 / 1024:.3f} MB.')
         process_mem = process.memory_info().rss
         log_to_file(heap_debug_path, f'OS-level memory usage after training: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
-        log_to_file(heap_debug_path, 'Heap after training:')
-        log_to_file(heap_debug_path, heap.heap())
-        heap.setref()
+        # log_to_file(heap_debug_path, 'Heap after training:')
+        # log_to_file(heap_debug_path, heap.heap())
+        # heap.setref()
 
       if T % args.evaluation_interval == 0:
         log(f'Starting to test at T = {T}')
@@ -381,9 +383,9 @@ else:
           process_mem = process.memory_info().rss
           log_to_file(heap_debug_path,
                       f'OS-level memory usage after testing: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
-          log_to_file(heap_debug_path, 'Heap after testing:')
-          log_to_file(heap_debug_path, heap.heap())
-          heap.setref()
+          # log_to_file(heap_debug_path, 'Heap after testing:')
+          # log_to_file(heap_debug_path, heap.heap())
+          # heap.setref()
 
         log('Before model save')
 
