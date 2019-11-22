@@ -465,11 +465,14 @@ else:
 
       # Check the potential bzip process
       if popen is not None and args.debug_heap:
-        out, err = popen.communicate(timeout=1)
-        if out is not None:
-          log_to_file(heap_debug_path, f'Popen stdout: {out}')
-        if err is not None:
-          log_to_file(heap_debug_path, f'Popen stderr: {err}')
+        try:
+          out, err = popen.communicate(timeout=1)
+          if out is not None:
+            log_to_file(heap_debug_path, f'Popen stdout: {out}')
+          if err is not None:
+            log_to_file(heap_debug_path, f'Popen stderr: {err}')
+        except subprocess.TimeoutExpired:
+          pass
 
         result = popen.poll()
         if result is not None:
