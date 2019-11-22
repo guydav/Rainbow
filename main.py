@@ -132,6 +132,7 @@ os.makedirs(memory_save_folder, exist_ok=True)
 replay_memory_pickle = f'{args.seed}-replay-memory.pickle'
 replay_memory_pickle_bz2 = f'{args.seed}-replay-memory.pickle.bz2'
 replay_memory_pickle_bz2_temp = f'{args.seed}-replay-memory.pickle.bz2.temp'
+replay_memory_pickle_bz2_final = f'{args.seed}-replay-memory.pickle.bz2.final'
 replay_memory_T_reached = f'{args.seed}-T-reached.txt'
 
 
@@ -175,12 +176,17 @@ def load_memory(use_bz2=True, use_native_pickle_serialization=False):
 
 @timeit
 def save_memory(memory, T_reached, use_native_pickle_serialization=False):
-  global replay_memory_pickle_bz2, replay_memory_pickle_bz2_temp, replay_memory_T_reached, heap_debug_path, process
+  global replay_memory_pickle, replay_memory_pickle_bz2, replay_memory_pickle_bz2_final
+  global replay_memory_T_reached, heap_debug_path, process
 
   popen = None
 
+  pickle_full_path = get_memory_file_path(replay_memory_pickle)
+  zipped_full_path = get_memory_file_path(replay_memory_pickle_bz2)
+  final_full_path = get_memory_file_path(replay_memory_pickle_bz2_final)
+
   if use_native_pickle_serialization:
-    with bz2.open(get_memory_file_path(replay_memory_pickle_bz2_temp), 'wb') as zipped_pickle_file:
+    with bz2.open(zipped_full_path, 'wb') as zipped_pickle_file:
       process_mem = process.memory_info().rss
       log_to_file(heap_debug_path,
                   f'OS-level memory usage after file open: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
@@ -192,7 +198,7 @@ def save_memory(memory, T_reached, use_native_pickle_serialization=False):
                   f'OS-level memory usage after save, before move: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
 
       # Switch to copying and moving separately to mitigate the effect of instant shutdown while writing
-      shutil.move(get_memory_file_path(replay_memory_pickle_bz2_temp), get_memory_file_path(replay_memory_pickle_bz2))
+      shutil.move(zipped_full_path, final_full_path)
 
       process_mem = process.memory_info().rss
       log_to_file(heap_debug_path,
@@ -200,8 +206,7 @@ def save_memory(memory, T_reached, use_native_pickle_serialization=False):
 
 
   else:
-    pickle_file_path = get_memory_file_path(replay_memory_pickle)
-    with open(pickle_file_path, 'wb') as pickle_file:
+    with open(pickle_full_path, 'wb') as pickle_file:
       process_mem = process.memory_info().rss
       log_to_file(heap_debug_path,
                   f'OS-level memory usage after file open: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
@@ -212,8 +217,8 @@ def save_memory(memory, T_reached, use_native_pickle_serialization=False):
       log_to_file(heap_debug_path,
                   f'OS-level memory usage after save, before bzip: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
 
-      # TODO: retain and poll these better in some way
-      popen = subprocess.Popen(['bzip2', '-z', pickle_file_path],
+      subprocess_args = ['bzip2', '-z', pickle_full_path, '&&', 'mv', zipped_full_path, final_full_path]
+      popen = subprocess.Popen(' '.join(subprocess_args), shell=True,
                                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
       process_mem = process.memory_info().rss
@@ -472,25 +477,20 @@ else:
 
           try:
             log_to_file(heap_debug_path, 'About to call popen.commumicate')
-            out, err = popen.communicate(timeout=1)
+            out, err = popen.communicate(timeout=10)
             if out is not None:
               log_to_file(heap_debug_path, f'Popen stdout: {out}')
             if err is not None:
               log_to_file(heap_debug_path, f'Popen stderr: {err}')
           except subprocess.TimeoutExpired:
             pass
-        else:
-          log_to_file(heap_debug_path, 'Result is none')
 
-        if result == 0:
           popen.terminate()
           popen = None
 
+        else:
+          log_to_file(heap_debug_path, 'Result is none')
 
-
-
-
-
-    state = next_state
+      state = next_state
 
 env.close()
