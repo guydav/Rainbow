@@ -214,7 +214,7 @@ def save_memory(memory, T_reached, use_native_pickle_serialization=False):
 
       # TODO: retain and poll these better in some way
       popen = subprocess.Popen(['bzip2', '-z', pickle_file_path],
-                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                               stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
       process_mem = process.memory_info().rss
       log_to_file(heap_debug_path,
@@ -465,21 +465,27 @@ else:
 
       # Check the potential bzip process
       if popen is not None and args.debug_heap:
-        try:
-          out, err = popen.communicate(timeout=1)
-          if out is not None:
-            log_to_file(heap_debug_path, f'Popen stdout: {out}')
-          if err is not None:
-            log_to_file(heap_debug_path, f'Popen stderr: {err}')
-        except subprocess.TimeoutExpired:
-          pass
-
         result = popen.poll()
         if result is not None:
           log_to_file(heap_debug_path, f'Popen return code: {result}')
 
+          try:
+            out, err = popen.communicate(timeout=1)
+            if out is not None:
+              log_to_file(heap_debug_path, f'Popen stdout: {out}')
+            if err is not None:
+              log_to_file(heap_debug_path, f'Popen stderr: {err}')
+          except subprocess.TimeoutExpired:
+            pass
+
         if result == 0:
+          popen.terminate()
           popen = None
+
+
+
+
+
 
     state = next_state
 
