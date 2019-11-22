@@ -470,7 +470,6 @@ else:
 
       # Check the potential bzip process
       if popen is not None and args.debug_heap:
-        log_to_file(heap_debug_path, 'About to call popen.poll')
         result = popen.poll()
         if result is not None:
           log_to_file(heap_debug_path, f'Popen return code: {result}')
@@ -487,9 +486,6 @@ else:
 
           popen.terminate()
           popen = None
-
-        else:
-          log_to_file(heap_debug_path, 'Result is none')
 
       state = next_state
 
