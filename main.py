@@ -177,6 +177,8 @@ def load_memory(use_bz2=True, use_native_pickle_serialization=False):
 def save_memory(memory, T_reached, use_native_pickle_serialization=False):
   global replay_memory_pickle_bz2, replay_memory_pickle_bz2_temp, replay_memory_T_reached, heap_debug_path, process
 
+  popen = None
+
   if use_native_pickle_serialization:
     with bz2.open(get_memory_file_path(replay_memory_pickle_bz2_temp), 'wb') as zipped_pickle_file:
       process_mem = process.memory_info().rss
@@ -211,7 +213,8 @@ def save_memory(memory, T_reached, use_native_pickle_serialization=False):
                   f'OS-level memory usage after save, before bzip: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
 
       # TODO: retain and poll these better in some way
-      subprocess.Popen(['bzip2', '-z', pickle_file_path])
+      popen = subprocess.Popen(['bzip2', '-z', pickle_file_path],
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
       process_mem = process.memory_info().rss
       log_to_file(heap_debug_path,
@@ -223,6 +226,8 @@ def save_memory(memory, T_reached, use_native_pickle_serialization=False):
   process_mem = process.memory_info().rss
   log_to_file(heap_debug_path,
               f'OS-level memory usage after T-reached file: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
+
+  return popen
 
 
 # Set up wandb
@@ -374,6 +379,8 @@ if args.evaluate:
   print('Avg. reward: ' + str(avg_reward) + ' | Avg. Q: ' + str(avg_Q))
 
 else:
+  popen = None
+
   # Training loop
   dqn.train()
   done = True
@@ -444,7 +451,7 @@ else:
                       f'OS-level memory usage after saving model: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
 
         log('Before memory save')
-        save_memory(mem, T, use_native_pickle_serialization=args.use_native_pickle_serialization)
+        popen = save_memory(mem, T, use_native_pickle_serialization=args.use_native_pickle_serialization)
         if args.debug_heap and T % args.heap_interval == 0:
           process_mem = process.memory_info().rss
           log_to_file(heap_debug_path,
@@ -455,6 +462,21 @@ else:
       # Update target network
       if T % args.target_update == 0:
         dqn.update_target_net()
+
+      # Check the potential bzip process
+      if popen is not None and args.debug_heap:
+        out, err = popen.communicate(timeout=1)
+        if out is not None:
+          log_to_file(heap_debug_path, f'Popen stdout: {out}')
+        if err is not None:
+          log_to_file(heap_debug_path, f'Popen stderr: {err}')
+
+        result = popen.poll()
+        if result is not None:
+          log_to_file(heap_debug_path, f'Popen return code: {result}')
+
+        if result == 0:
+          popen = None
 
     state = next_state
 
