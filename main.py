@@ -8,6 +8,7 @@ import psutil
 import pickle
 import shutil
 import time
+import subprocess
 
 import atari_py
 import numpy as np
@@ -154,6 +155,8 @@ def get_memory_file_path(name, folder=memory_save_folder):
 def load_memory(use_bz2=True, use_native_pickle_serialization=False):
   global replay_memory_pickle_bz2, replay_memory_pickle
 
+  # TODO: implement loading of these new torch files
+
   if use_native_pickle_serialization:
     if use_bz2:
       with bz2.open(get_memory_file_path(replay_memory_pickle_bz2), 'rb') as zipped_pickle_file:
@@ -174,26 +177,45 @@ def load_memory(use_bz2=True, use_native_pickle_serialization=False):
 def save_memory(memory, T_reached, use_native_pickle_serialization=False):
   global replay_memory_pickle_bz2, replay_memory_pickle_bz2_temp, replay_memory_T_reached, heap_debug_path, process
 
-  with bz2.open(get_memory_file_path(replay_memory_pickle_bz2_temp), 'wb') as zipped_pickle_file:
-    process_mem = process.memory_info().rss
-    log_to_file(heap_debug_path,
-                f'OS-level memory usage after file open: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
+  if use_native_pickle_serialization:
+    with bz2.open(get_memory_file_path(replay_memory_pickle_bz2_temp), 'wb') as zipped_pickle_file:
+      process_mem = process.memory_info().rss
+      log_to_file(heap_debug_path,
+                  f'OS-level memory usage after file open: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
 
-    if use_native_pickle_serialization:
       pickle.dump(memory, zipped_pickle_file, protocol=pickle.HIGHEST_PROTOCOL)
-    else:
-      torch.save(memory, zipped_pickle_file, pickle_protocol=pickle.HIGHEST_PROTOCOL)
 
-  process_mem = process.memory_info().rss
-  log_to_file(heap_debug_path,
-              f'OS-level memory usage after save, before move: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
+      process_mem = process.memory_info().rss
+      log_to_file(heap_debug_path,
+                  f'OS-level memory usage after save, before move: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
 
-  # Switch to copying and moving separately to mitigate the effect of instant shutdown while writing
-  shutil.move(get_memory_file_path(replay_memory_pickle_bz2_temp), get_memory_file_path(replay_memory_pickle_bz2))
+      # Switch to copying and moving separately to mitigate the effect of instant shutdown while writing
+      shutil.move(get_memory_file_path(replay_memory_pickle_bz2_temp), get_memory_file_path(replay_memory_pickle_bz2))
 
-  process_mem = process.memory_info().rss
-  log_to_file(heap_debug_path,
-              f'OS-level memory usage after move: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
+      process_mem = process.memory_info().rss
+      log_to_file(heap_debug_path,
+                  f'OS-level memory usage after move: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
+
+
+  else:
+    pickle_file_path = get_memory_file_path(replay_memory_pickle)
+    with open(pickle_file_path, 'wb') as pickle_file:
+      process_mem = process.memory_info().rss
+      log_to_file(heap_debug_path,
+                  f'OS-level memory usage after file open: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
+
+      torch.save(memory, pickle_file, pickle_protocol=pickle.HIGHEST_PROTOCOL)
+
+      process_mem = process.memory_info().rss
+      log_to_file(heap_debug_path,
+                  f'OS-level memory usage after save, before bzip: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
+
+      # TODO: retain and poll these better in some way
+      subprocess.Popen(['bzip2', '-z', pickle_file_path])
+
+      process_mem = process.memory_info().rss
+      log_to_file(heap_debug_path,
+                  f'OS-level memory usage after starting bzip: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
 
   with open(get_memory_file_path(replay_memory_T_reached), 'w') as memory_T_file:
     memory_T_file.write(str(T_reached))
