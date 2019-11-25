@@ -154,24 +154,48 @@ def get_memory_file_path(name, folder=memory_save_folder):
 
 @timeit
 def load_memory(use_bz2=True, use_native_pickle_serialization=False):
-  global replay_memory_pickle_bz2, replay_memory_pickle
+  global replay_memory_pickle, replay_memory_pickle_bz2, replay_memory_pickle_bz2_final
+  global replay_memory_T_reached, heap_debug_path, process
 
-  # TODO: implement loading of these new torch files
+  popen = None
+
+  pickle_full_path = get_memory_file_path(replay_memory_pickle)
+  zipped_full_path = get_memory_file_path(replay_memory_pickle_bz2)
+  final_full_path = get_memory_file_path(replay_memory_pickle_bz2_final)
 
   if use_native_pickle_serialization:
     if use_bz2:
-      with bz2.open(get_memory_file_path(replay_memory_pickle_bz2), 'rb') as zipped_pickle_file:
+      with bz2.open(zipped_full_path, 'rb') as zipped_pickle_file:
         return pickle.load(zipped_pickle_file)
 
     else:
-      with open(get_memory_file_path(replay_memory_pickle), 'rb') as regular_pickle_file:
+      with open(pickle_full_path, 'rb') as regular_pickle_file:
         return pickle.load(regular_pickle_file)
 
   else:
-    # Torch load came after bz2, so assumed
-    with bz2.open(get_memory_file_path(replay_memory_pickle_bz2), 'rb') as zipped_pickle_file:
-      return torch.load(zipped_pickle_file)
+    # Copy "final" file to zipped name
+    shutil.copy(final_full_path, zipped_full_path)
 
+    # Unzip
+    subprocess_args = ['bzip2', '-d', zipped_full_path]
+    popen = subprocess.Popen(' '.join(subprocess_args), shell=True,
+                             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+    out, err = popen.communicate()
+    log(f'Memory load unzip popen return code: {popen.returncode}')
+    if out is not None:
+      log(f'Popen stdout: {out}')
+    if err is not None:
+      log(f'Popen stderr: {err}')
+
+    # Load memory
+    with open(pickle_full_path, 'rb') as regular_pickle_file:
+      memory = torch.load(regular_pickle_file)
+
+    # Remove the unzipped file
+    os.remove(pickle_full_path)
+
+    return memory
 
 
 @timeit
