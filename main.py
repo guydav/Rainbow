@@ -136,6 +136,20 @@ replay_memory_pickle_bz2_final = f'{args.seed}-replay-memory.pickle.bz2.final'
 replay_memory_T_reached = f'{args.seed}-T-reached.txt'
 
 
+# Simple ISO 8601 timestamped logger
+def log_message(s):
+  return f'[{str(datetime.now().strftime("%Y-%m-%dT%H:%M:%S"))}]: {s}'
+
+
+def log(s):
+  print(log_message(s))
+
+
+def log_to_file(path, s):
+  with open(path, 'a') as log_file:
+    log_file.write(f'{log_message(s)}\n')
+
+
 def timeit(method):
     def timed(*args, **kw):
         start_time = time.time()
@@ -347,20 +361,6 @@ wandb.save(os.path.join(wandb.run.dir, '*.pth'))
 
 memory_save_folder = os.path.join(args.memory_save_folder, args.id)
 os.makedirs(memory_save_folder, exist_ok=True)
-
-
-# Simple ISO 8601 timestamped logger
-def log_message(s):
-  return f'[{str(datetime.now().strftime("%Y-%m-%dT%H:%M:%S"))}]: {s}'
-
-
-def log(s):
-  print(log_message(s))
-
-
-def log_to_file(path, s):
-  with open(path, 'a') as log_file:
-    log_file.write(f'{log_message(s)}\n')
 
 
 # Augmented representations and Environments
