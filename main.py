@@ -191,7 +191,7 @@ def load_memory(use_bz2=True, use_native_pickle_serialization=False):
     shutil.copy(final_full_path, zipped_full_path)
 
     # Unzip
-    subprocess_args = ['bzip2', '-d', zipped_full_path]
+    subprocess_args = ['bzip2', '-f', '-d', zipped_full_path]
     popen = subprocess.Popen(' '.join(subprocess_args), shell=True,
                              stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
@@ -255,7 +255,7 @@ def save_memory(memory, T_reached, use_native_pickle_serialization=False):
       log_to_file(heap_debug_path,
                   f'OS-level memory usage after save, before bzip: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
 
-      subprocess_args = ['bzip2', '-z', pickle_full_path, '&&', 'mv', zipped_full_path, final_full_path]
+      subprocess_args = ['bzip2', '-f', '-z', pickle_full_path, '&&', 'mv', zipped_full_path, final_full_path]
       popen = subprocess.Popen(' '.join(subprocess_args), shell=True,
                                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
