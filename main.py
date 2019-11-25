@@ -197,9 +197,9 @@ def load_memory(use_bz2=True, use_native_pickle_serialization=False):
 
     out, err = popen.communicate()
     log(f'Memory load unzip popen return code: {popen.returncode}')
-    if out is not None:
+    if out is not None and len(out) > 0:
       log(f'Popen stdout: {out}')
-    if err is not None:
+    if err is not None and len(err) > 0:
       log(f'Popen stderr: {err}')
 
     # Load memory
@@ -501,9 +501,9 @@ else:
           try:
             log_to_file(heap_debug_path, 'About to call popen.commumicate')
             out, err = popen.communicate(timeout=10)
-            if out is not None:
+            if out is not None and len(out) > 0:
               log_to_file(heap_debug_path, f'Popen stdout: {out}')
-            if err is not None:
+            if err is not None and len(err) > 0:
               log_to_file(heap_debug_path, f'Popen stderr: {err}')
           except subprocess.TimeoutExpired:
             pass
