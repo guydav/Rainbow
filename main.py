@@ -2,7 +2,7 @@
 from __future__ import division
 import argparse
 import bz2
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 import psutil
 import pickle
@@ -79,9 +79,15 @@ parser.add_argument('--memory-save-folder', default=DEFAULT_MEMORY_SAVE_FOLDER)
 parser.add_argument('--use-native-pickle-serialization', action='store_true', help='Use native pickle saving rather than torch.save()')
 
 # Arguments for the augmented representations
-parser.add_argument('--add-masks', action='store_true')
-parser.add_argument('--maskers', default=None)
-parser.add_argument('--use-numpy-masker', action='store_true')
+parser.add_argument('--add-masks', action='store_true', help='Add masks for each semantic object types')
+parser.add_argument('--maskers', default=None, help='Select specific maskers to use')
+parser.add_argument('--use-numpy-masker', action='store_true', help='Use the previous, much slower numpy-based masker')
+parser.add_argument('--omit-pixels', action='store_true', help='Omit the raw pixels from the environment')
+
+# Arguments to give it a soft time cap that will help it not fail
+parser.add_argument('--soft-time-cap', help='Format: <DD>:HH:MM, stop after some soft cap such that the saving the memory does not fail')
+
+# Debugging-related arguments
 parser.add_argument('--debug-heap', action='store_true')
 parser.add_argument('--heap-interval', default=1e4)
 parser.add_argument('--heap-debug-file', default=None)
@@ -134,6 +140,17 @@ replay_memory_pickle_bz2 = f'{args.seed}-replay-memory.pickle.bz2'
 replay_memory_pickle_bz2_temp = f'{args.seed}-replay-memory.pickle.bz2.temp'
 replay_memory_pickle_bz2_final = f'{args.seed}-replay-memory.pickle.bz2.final'
 replay_memory_T_reached = f'{args.seed}-T-reached.txt'
+
+if args.soft_time_cap is not None:
+  start_time = datetime.now()
+  split_time_cap = [int(x.strip()) for x in args.soft_time_cap.split(':')]
+  if len(split_time_cap) < 2 or len(split_time_cap) > 3:
+    raise ValueError(f'Expected time cap to have the format <DD>:HH:MM, got {args.soft_time_cap}')
+
+  if len(split_time_cap) == 2:
+    split_time_cap.insert(0, 0)
+
+  end_time = start_time + timedelta(days=split_time_cap[0], hours=split_time_cap[1], minutes=split_time_cap[2])
 
 
 # Simple ISO 8601 timestamped logger
@@ -395,6 +412,39 @@ if args.debug_heap:
   if heap_debug_path is None:
     heap_debug_path = os.path.join(results_dir, 'heap_debug.log')
 
+
+def evaluate_and_save_memory(t, dqn):
+  log(f'Starting to test at T = {t}')
+  dqn.eval()  # Set DQN (online network) to evaluation mode
+  avg_reward, avg_Q = test(args, t, dqn, val_mem, metrics, results_dir)  # Test
+  log('T = ' + str(T) + ' / ' + str(args.T_max) + ' | Avg. reward: ' + str(avg_reward) + ' | Avg. Q: ' + str(avg_Q))
+  dqn.train()  # Set DQN (online network) back to training mode
+
+  if args.debug_heap and t % args.heap_interval == 0:
+    log_to_file(heap_debug_path, f'After {T} steps:')
+    process_mem = process.memory_info().rss
+    log_to_file(heap_debug_path,
+                f'OS-level memory usage after testing: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
+
+  log('Before model save')
+  dqn.save(wandb.run.dir, f'{wandb_name}-{t}.pth')
+  if args.debug_heap and t % args.heap_interval == 0:
+    process_mem = process.memory_info().rss
+    log_to_file(heap_debug_path,
+                f'OS-level memory usage after saving model: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
+
+  log('Before memory save')
+  popen = save_memory(mem, t, use_native_pickle_serialization=args.use_native_pickle_serialization)
+  if args.debug_heap and t % args.heap_interval == 0:
+    process_mem = process.memory_info().rss
+    log_to_file(heap_debug_path,
+                f'OS-level memory usage after saving memory: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
+
+  log('After both saves')
+
+  return popen
+
+
 if args.evaluate:
   dqn.eval()  # Set DQN (online network) to evaluation mode
   avg_reward, avg_Q = test(args, T_start, dqn, val_mem, metrics, results_dir, evaluate=True)  # Test
@@ -406,7 +456,28 @@ else:
   # Training loop
   dqn.train()
   done = True
+  
   for T in trange(T_start + 1, args.T_max + 1):
+
+    if args.soft_time_cap is not None and end_time < datetime.now():
+      log(f'Hit some time cap, evaluating, saving, and exiting')
+      popen = evaluate_and_save_memory(T, dqn)
+
+      log_to_file(heap_debug_path, 'About to call popen.commumicate')
+      out, err = popen.communicate()
+
+      result = popen.returncode
+      log_to_file(heap_debug_path, f'Popen return code: {result}')
+
+      if out is not None and len(out) > 0:
+        log_to_file(heap_debug_path, f'Popen stdout: {out}')
+      if err is not None and len(err) > 0:
+        log_to_file(heap_debug_path, f'Popen stderr: {err}')
+
+      popen.terminate()
+      popen = None
+      break
+
     if done:
       state, done = env.reset(), False
 
@@ -432,54 +503,9 @@ else:
         log_to_file(heap_debug_path, f'After {T} steps, replay buffer size is {replay_size}, {process_mem / 1024.0 / replay_size:.3f} KB/transition')
         log_to_file(heap_debug_path,
                     f'OS-level memory usage after training: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
-        # allocated = torch.cuda.memory_allocated(args.device)
-        # log_to_file(heap_debug_path,
-        #             f'CUDA memory allocated after training: {allocated} bytes = {allocated / 1024.0 / 1024:.3f} MB.')
-        # cached = torch.cuda.memory_cached(args.device)
-        # log_to_file(heap_debug_path,
-        #             f'CUDA memory cached after training: {cached} bytes = {cached / 1024.0 / 1024:.3f} MB.')
-        # log_to_file(heap_debug_path, 'Heap after training:')
-        # log_to_file(heap_debug_path, heap.heap())
-        # heap.setref()
 
       if T % args.evaluation_interval == 0:
-        log(f'Starting to test at T = {T}')
-        dqn.eval()  # Set DQN (online network) to evaluation mode
-        avg_reward, avg_Q = test(args, T, dqn, val_mem, metrics, results_dir)  # Test
-        log('T = ' + str(T) + ' / ' + str(args.T_max) + ' | Avg. reward: ' + str(avg_reward) + ' | Avg. Q: ' + str(avg_Q))
-        dqn.train()  # Set DQN (online network) back to training mode
-
-        if args.debug_heap and T % args.heap_interval == 0:
-          log_to_file(heap_debug_path, f'After {T} steps:')
-          # allocated = torch.cuda.memory_allocated(args.device)
-          # log_to_file(heap_debug_path,
-          #             f'CUDA memory allocated after testing: {allocated} bytes = {allocated / 1024.0 / 1024:.3f} MB.')
-          # cached = torch.cuda.memory_cached(args.device)
-          # log_to_file(heap_debug_path,
-          #             f'CUDA memory cached after testing: {cached} bytes = {cached / 1024.0 / 1024:.3f} MB.')
-          process_mem = process.memory_info().rss
-          log_to_file(heap_debug_path,
-                      f'OS-level memory usage after testing: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
-          # log_to_file(heap_debug_path, 'Heap after testing:')
-          # log_to_file(heap_debug_path, heap.heap())
-          # heap.setref()
-
-        log('Before model save')
-
-        dqn.save(wandb.run.dir, f'{wandb_name}-{T}.pth')
-        if args.debug_heap and T % args.heap_interval == 0:
-          process_mem = process.memory_info().rss
-          log_to_file(heap_debug_path,
-                      f'OS-level memory usage after saving model: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
-
-        log('Before memory save')
-        popen = save_memory(mem, T, use_native_pickle_serialization=args.use_native_pickle_serialization)
-        if args.debug_heap and T % args.heap_interval == 0:
-          process_mem = process.memory_info().rss
-          log_to_file(heap_debug_path,
-                      f'OS-level memory usage after saving memory: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
-
-        log('After both saves')
+        popen = evaluate_and_save_memory(T, dqn)
 
       # Update target network
       if T % args.target_update == 0:

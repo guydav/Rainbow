@@ -26,6 +26,7 @@ class Env():
     self.state_buffer = deque([], maxlen=args.history_length)
     self.training = True  # Consistent with model training mode
     self.state_depth = args.state_depth
+    self.omit_pixels = args.omit_pixels
 
   def _resize(self, frame):
     if isinstance(frame, torch.Tensor):
@@ -46,10 +47,15 @@ class Env():
     augmentation = self._augment_state(full_color_state)
 
     if isinstance(augmentation, torch.Tensor):
-#       return torch.cat((observation, augmentation), dim=1).squeeze(0)  # dim=1 to allow for the empty "batch" dimension at 0
-      return torch.cat((observation.squeeze(0), augmentation.squeeze(0)))  # dim=1 to allow for the empty "batch" dimension at 0
+      if self.omit_pixels:
+        return augmentation.squeeze(0)
+      else:
+        return torch.cat((observation.squeeze(0), augmentation.squeeze(0)))
     else:
-      return torch.stack((observation.squeeze(), *augmentation))
+      if self.omit_pixels:
+        return torch.stack(augmentation)
+      else:
+        return torch.stack((observation.squeeze(), *augmentation))
 
   def _augment_state(self, full_color_state):
     return list()
