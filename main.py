@@ -94,6 +94,12 @@ parser.add_argument('--heap-debug-file', default=None)
 
 # Setup
 args = parser.parse_args()
+
+# Handle slurm array ids
+array_id = os.getenv('SLURM_ARRAY_TASK_ID')
+if array_id is not None:
+  args.seed = args.seed + int(array_id)
+
 print(' ' * 26 + 'Options')
 for k, v in vars(args).items():
   print(' ' * 26 + k + ': ' + str(v))
@@ -114,10 +120,6 @@ if args.save_evaluation_states:
 
 metrics = {'steps': [], 'rewards': [], 'Qs': [], 'best_avg_reward': -float('inf')}
 
-# Handle slurm array ids
-array_id = os.getenv('SLURM_ARRAY_TASK_ID')
-if array_id is not None:
-  args.seed = args.seed + int(array_id)
 
 np.random.seed(args.seed)
 # TODO: why not just fix the torch seed to the same one as np?
@@ -154,17 +156,21 @@ if args.soft_time_cap is not None:
 
 
 # Simple ISO 8601 timestamped logger
-def log_message(s):
+def format_log_message(s):
   return f'[{str(datetime.now().strftime("%Y-%m-%dT%H:%M:%S"))}]: {s}'
-
-
-def log(s):
-  print(log_message(s))
 
 
 def log_to_file(path, s):
   with open(path, 'a') as log_file:
-    log_file.write(f'{log_message(s)}\n')
+    log_file.write(f'{format_log_message(s)}\n')
+
+
+def log(s, write_to_file=True):
+  msg = format_log_message(s)
+  print(msg)
+
+  if write_to_file:
+    log_to_file(general_debug_log_path, msg)
 
 
 def timeit(method):
@@ -186,9 +192,9 @@ def get_memory_file_path(name, folder=memory_save_folder):
 @timeit
 def load_memory(use_bz2=True, use_native_pickle_serialization=False):
   global replay_memory_pickle, replay_memory_pickle_bz2, replay_memory_pickle_bz2_final
-  global replay_memory_T_reached, heap_debug_path, process
+  global replay_memory_T_reached, heap_debug_log_path, process
 
-  popen = None
+  unzip_process = None
 
   pickle_full_path = get_memory_file_path(replay_memory_pickle)
   zipped_full_path = get_memory_file_path(replay_memory_pickle_bz2)
@@ -209,10 +215,10 @@ def load_memory(use_bz2=True, use_native_pickle_serialization=False):
 
     # Unzip
     subprocess_args = ['bzip2', '-f', '-d', zipped_full_path]
-    popen = subprocess.Popen(' '.join(subprocess_args), shell=True,
+    unzip_process = subprocess.Popen(' '.join(subprocess_args), shell=True,
                              stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-    out, err = popen.communicate()
+    out, err = unzip_process.communicate()
     log(f'Memory load unzip popen return code: {popen.returncode}')
     if out is not None and len(out) > 0:
       log(f'Popen stdout: {out}')
@@ -232,7 +238,7 @@ def load_memory(use_bz2=True, use_native_pickle_serialization=False):
 @timeit
 def save_memory(memory, T_reached, use_native_pickle_serialization=False):
   global replay_memory_pickle, replay_memory_pickle_bz2, replay_memory_pickle_bz2_final
-  global replay_memory_T_reached, heap_debug_path, process
+  global replay_memory_T_reached, heap_debug_log_path, process
 
   popen = None
 
@@ -243,33 +249,33 @@ def save_memory(memory, T_reached, use_native_pickle_serialization=False):
   if use_native_pickle_serialization:
     with bz2.open(zipped_full_path, 'wb') as zipped_pickle_file:
       process_mem = process.memory_info().rss
-      log_to_file(heap_debug_path,
+      log_to_file(heap_debug_log_path,
                   f'OS-level memory usage after file open: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
 
       pickle.dump(memory, zipped_pickle_file, protocol=pickle.HIGHEST_PROTOCOL)
 
       process_mem = process.memory_info().rss
-      log_to_file(heap_debug_path,
+      log_to_file(heap_debug_log_path,
                   f'OS-level memory usage after save, before move: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
 
       # Switch to copying and moving separately to mitigate the effect of instant shutdown while writing
       shutil.move(zipped_full_path, final_full_path)
 
       process_mem = process.memory_info().rss
-      log_to_file(heap_debug_path,
+      log_to_file(heap_debug_log_path,
                   f'OS-level memory usage after move: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
 
 
   else:
     with open(pickle_full_path, 'wb') as pickle_file:
       process_mem = process.memory_info().rss
-      log_to_file(heap_debug_path,
+      log_to_file(heap_debug_log_path,
                   f'OS-level memory usage after file open: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
 
       torch.save(memory, pickle_file, pickle_protocol=pickle.HIGHEST_PROTOCOL)
 
       process_mem = process.memory_info().rss
-      log_to_file(heap_debug_path,
+      log_to_file(heap_debug_log_path,
                   f'OS-level memory usage after save, before bzip: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
 
       subprocess_args = ['bzip2', '-f', '-z', pickle_full_path, '&&', 'mv', zipped_full_path, final_full_path]
@@ -277,14 +283,14 @@ def save_memory(memory, T_reached, use_native_pickle_serialization=False):
                                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
       process_mem = process.memory_info().rss
-      log_to_file(heap_debug_path,
+      log_to_file(heap_debug_log_path,
                   f'OS-level memory usage after starting bzip: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
 
   with open(get_memory_file_path(replay_memory_T_reached), 'w') as memory_T_file:
     memory_T_file.write(str(T_reached))
 
   process_mem = process.memory_info().rss
-  log_to_file(heap_debug_path,
+  log_to_file(heap_debug_log_path,
               f'OS-level memory usage after T-reached file: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
 
   return popen
@@ -372,6 +378,17 @@ wandb.save(os.path.join(wandb.run.dir, '*.pth'))
 memory_save_folder = os.path.join(args.memory_save_folder, args.id)
 os.makedirs(memory_save_folder, exist_ok=True)
 
+if args.debug_heap:
+  process = psutil.Process()
+  # heap = hpy()
+  # heap.setref()
+
+  heap_debug_log_path = args.heap_debug_file
+  if heap_debug_log_path is None:
+    heap_debug_log_path = os.path.join(results_dir, 'heap_debug.log')
+
+general_debug_log_path = os.path.join(results_dir, 'debug.log')
+
 
 # Augmented representations and Environments
 env = make_env(args)
@@ -403,15 +420,6 @@ if args.wandb_resume and T_resume is not None:
   T_start = T_resume
   mem = loaded_replay_memory
 
-if args.debug_heap:
-  process = psutil.Process()
-  # heap = hpy()
-  # heap.setref()
-
-  heap_debug_path = args.heap_debug_file
-  if heap_debug_path is None:
-    heap_debug_path = os.path.join(results_dir, 'heap_debug.log')
-
 
 def evaluate_and_save_memory(t, dqn):
   log(f'Starting to test at T = {t}')
@@ -421,23 +429,23 @@ def evaluate_and_save_memory(t, dqn):
   dqn.train()  # Set DQN (online network) back to training mode
 
   if args.debug_heap and t % args.heap_interval == 0:
-    log_to_file(heap_debug_path, f'After {T} steps:')
+    log_to_file(heap_debug_log_path, f'After {T} steps:')
     process_mem = process.memory_info().rss
-    log_to_file(heap_debug_path,
+    log_to_file(heap_debug_log_path,
                 f'OS-level memory usage after testing: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
 
   log('Before model save')
   dqn.save(wandb.run.dir, f'{wandb_name}-{t}.pth')
   if args.debug_heap and t % args.heap_interval == 0:
     process_mem = process.memory_info().rss
-    log_to_file(heap_debug_path,
+    log_to_file(heap_debug_log_path,
                 f'OS-level memory usage after saving model: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
 
   log('Before memory save')
   popen = save_memory(mem, t, use_native_pickle_serialization=args.use_native_pickle_serialization)
   if args.debug_heap and t % args.heap_interval == 0:
     process_mem = process.memory_info().rss
-    log_to_file(heap_debug_path,
+    log_to_file(heap_debug_log_path,
                 f'OS-level memory usage after saving memory: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
 
   log('After both saves')
@@ -456,24 +464,24 @@ else:
   # Training loop
   dqn.train()
   done = True
-  
+
   for T in trange(T_start + 1, args.T_max + 1):
 
     if args.soft_time_cap is not None and end_time < datetime.now():
       log(f'Hit some time cap, evaluating, saving, and exiting')
       popen = evaluate_and_save_memory(T, dqn)
 
-      log_to_file(heap_debug_path, 'About to call popen.commumicate')
+      log_to_file(heap_debug_log_path, 'About to call popen.commumicate')
       out, err = popen.communicate()
-
+      
       result = popen.returncode
-      log_to_file(heap_debug_path, f'Popen return code: {result}')
+      log_to_file(heap_debug_log_path, f'Popen return code: {result}')
 
       if out is not None and len(out) > 0:
-        log_to_file(heap_debug_path, f'Popen stdout: {out}')
+        log_to_file(heap_debug_log_path, f'Popen stdout: {out}')
       if err is not None and len(err) > 0:
-        log_to_file(heap_debug_path, f'Popen stderr: {err}')
-
+        log_to_file(heap_debug_log_path, f'Popen stderr: {err}')
+        
       popen.terminate()
       popen = None
       break
@@ -500,8 +508,8 @@ else:
       if args.debug_heap and T % args.heap_interval == 0:
         replay_size = mem.capacity if mem.transitions.full else mem.transitions.index
         process_mem = process.memory_info().rss
-        log_to_file(heap_debug_path, f'After {T} steps, replay buffer size is {replay_size}, {process_mem / 1024.0 / replay_size:.3f} KB/transition')
-        log_to_file(heap_debug_path,
+        log_to_file(heap_debug_log_path, f'After {T} steps, replay buffer size is {replay_size}, {process_mem / 1024.0 / replay_size:.3f} KB/transition')
+        log_to_file(heap_debug_log_path,
                     f'OS-level memory usage after training: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
 
       if T % args.evaluation_interval == 0:
@@ -515,15 +523,15 @@ else:
       if popen is not None and args.debug_heap:
         result = popen.poll()
         if result is not None:
-          log_to_file(heap_debug_path, f'Popen return code: {result}')
+          log_to_file(heap_debug_log_path, f'Popen return code: {result}')
 
           try:
-            log_to_file(heap_debug_path, 'About to call popen.commumicate')
+            log_to_file(heap_debug_log_path, 'About to call popen.commumicate')
             out, err = popen.communicate(timeout=10)
             if out is not None and len(out) > 0:
-              log_to_file(heap_debug_path, f'Popen stdout: {out}')
+              log_to_file(heap_debug_log_path, f'Popen stdout: {out}')
             if err is not None and len(err) > 0:
-              log_to_file(heap_debug_path, f'Popen stderr: {err}')
+              log_to_file(heap_debug_log_path, f'Popen stderr: {err}')
           except subprocess.TimeoutExpired:
             pass
 
