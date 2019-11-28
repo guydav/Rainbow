@@ -473,18 +473,35 @@ else:
 
     if args.soft_time_cap is not None and end_time < datetime.now():
       log(f'Hit some time cap, evaluating, saving, and exiting')
+
+      if popen is not None:
+        log('Waiting for previous popen to end')
+        log('About to call popen.commumicate')
+        out, err = popen.communicate()
+
+        result = popen.returncode
+        log(f'Popen return code: {result}')
+
+        if out is not None and len(out) > 0:
+          log(f'Popen stdout: {out}')
+        if err is not None and len(err) > 0:
+          log(f'Popen stderr: {err}')
+
+        popen.terminate()
+        popen = None
+
       popen = evaluate_and_save_memory(T, dqn)
 
-      log_to_file(heap_debug_log_path, 'About to call popen.commumicate')
+      log('About to call popen.commumicate')
       out, err = popen.communicate()
       
       result = popen.returncode
-      log_to_file(heap_debug_log_path, f'Popen return code: {result}')
+      log(f'Popen return code: {result}')
 
       if out is not None and len(out) > 0:
-        log_to_file(heap_debug_log_path, f'Popen stdout: {out}')
+        log(f'Popen stdout: {out}')
       if err is not None and len(err) > 0:
-        log_to_file(heap_debug_log_path, f'Popen stderr: {err}')
+        log(f'Popen stderr: {err}')
         
       popen.terminate()
       popen = None
@@ -524,7 +541,7 @@ else:
         dqn.update_target_net()
 
       # Check the potential bzip process
-      if popen is not None and args.debug_heap:
+      if popen is not None:
         result = popen.poll()
         if result is not None:
           log_to_file(heap_debug_log_path, f'Popen return code: {result}')
