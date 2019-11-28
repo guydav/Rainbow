@@ -219,7 +219,7 @@ def load_memory(use_bz2=True, use_native_pickle_serialization=False):
                              stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
     out, err = unzip_process.communicate()
-    log(f'Memory load unzip popen return code: {popen.returncode}')
+    log(f'Memory load unzip popen return code: {unzip_process.returncode}')
     if out is not None and len(out) > 0:
       log(f'Popen stdout: {out}')
     if err is not None and len(err) > 0:
@@ -240,7 +240,7 @@ def save_memory(memory, T_reached, use_native_pickle_serialization=False):
   global replay_memory_pickle, replay_memory_pickle_bz2, replay_memory_pickle_bz2_final
   global replay_memory_T_reached, heap_debug_log_path, process
 
-  popen = None
+  save_process = None
 
   pickle_full_path = get_memory_file_path(replay_memory_pickle)
   zipped_full_path = get_memory_file_path(replay_memory_pickle_bz2)
@@ -279,7 +279,7 @@ def save_memory(memory, T_reached, use_native_pickle_serialization=False):
                   f'OS-level memory usage after save, before bzip: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
 
       subprocess_args = ['bzip2', '-f', '-z', pickle_full_path, '&&', 'mv', zipped_full_path, final_full_path]
-      popen = subprocess.Popen(' '.join(subprocess_args), shell=True,
+      save_process = subprocess.Popen(' '.join(subprocess_args), shell=True,
                                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
       process_mem = process.memory_info().rss
@@ -293,7 +293,39 @@ def save_memory(memory, T_reached, use_native_pickle_serialization=False):
   log_to_file(heap_debug_log_path,
               f'OS-level memory usage after T-reached file: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
 
-  return popen
+  return save_process
+
+
+def evaluate_and_save_memory(t, dqn):
+  log(f'Starting to test at T = {t}')
+  dqn.eval()  # Set DQN (online network) to evaluation mode
+  avg_reward, avg_Q = test(args, t, dqn, val_mem, metrics, results_dir)  # Test
+  log('T = ' + str(T) + ' / ' + str(args.T_max) + ' | Avg. reward: ' + str(avg_reward) + ' | Avg. Q: ' + str(avg_Q))
+  dqn.train()  # Set DQN (online network) back to training mode
+
+  if args.debug_heap and t % args.heap_interval == 0:
+    log_to_file(heap_debug_log_path, f'After {T} steps:')
+    process_mem = process.memory_info().rss
+    log_to_file(heap_debug_log_path,
+                f'OS-level memory usage after testing: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
+
+  log('Before model save')
+  dqn.save(wandb.run.dir, f'{wandb_name}-{t}.pth')
+  if args.debug_heap and t % args.heap_interval == 0:
+    process_mem = process.memory_info().rss
+    log_to_file(heap_debug_log_path,
+                f'OS-level memory usage after saving model: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
+
+  log('Before memory save')
+  save_process = save_memory(mem, t, use_native_pickle_serialization=args.use_native_pickle_serialization)
+  if args.debug_heap and t % args.heap_interval == 0:
+    process_mem = process.memory_info().rss
+    log_to_file(heap_debug_log_path,
+                f'OS-level memory usage after saving memory: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
+
+  log('After both saves')
+
+  return save_process
 
 
 # Set up wandb
@@ -419,38 +451,6 @@ T_start = 0
 if args.wandb_resume and T_resume is not None:
   T_start = T_resume
   mem = loaded_replay_memory
-
-
-def evaluate_and_save_memory(t, dqn):
-  log(f'Starting to test at T = {t}')
-  dqn.eval()  # Set DQN (online network) to evaluation mode
-  avg_reward, avg_Q = test(args, t, dqn, val_mem, metrics, results_dir)  # Test
-  log('T = ' + str(T) + ' / ' + str(args.T_max) + ' | Avg. reward: ' + str(avg_reward) + ' | Avg. Q: ' + str(avg_Q))
-  dqn.train()  # Set DQN (online network) back to training mode
-
-  if args.debug_heap and t % args.heap_interval == 0:
-    log_to_file(heap_debug_log_path, f'After {T} steps:')
-    process_mem = process.memory_info().rss
-    log_to_file(heap_debug_log_path,
-                f'OS-level memory usage after testing: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
-
-  log('Before model save')
-  dqn.save(wandb.run.dir, f'{wandb_name}-{t}.pth')
-  if args.debug_heap and t % args.heap_interval == 0:
-    process_mem = process.memory_info().rss
-    log_to_file(heap_debug_log_path,
-                f'OS-level memory usage after saving model: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
-
-  log('Before memory save')
-  popen = save_memory(mem, t, use_native_pickle_serialization=args.use_native_pickle_serialization)
-  if args.debug_heap and t % args.heap_interval == 0:
-    process_mem = process.memory_info().rss
-    log_to_file(heap_debug_log_path,
-                f'OS-level memory usage after saving memory: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
-
-  log('After both saves')
-
-  return popen
 
 
 if args.evaluate:
