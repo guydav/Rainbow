@@ -103,6 +103,7 @@ if array_id is not None:
 print(' ' * 26 + 'Options')
 for k, v in vars(args).items():
   print(' ' * 26 + k + ': ' + str(v))
+
 results_dir = os.path.join('results', f'{args.id}-{args.seed}')
 os.makedirs(results_dir, exist_ok=True)
 
@@ -143,6 +144,20 @@ replay_memory_pickle_bz2_temp = f'{args.seed}-replay-memory.pickle.bz2.temp'
 replay_memory_pickle_bz2_final = f'{args.seed}-replay-memory.pickle.bz2.final'
 replay_memory_T_reached = f'{args.seed}-T-reached.txt'
 
+
+
+if args.debug_heap:
+  process = psutil.Process()
+  # heap = hpy()
+  # heap.setref()
+
+  heap_debug_log_path = args.heap_debug_file
+  if heap_debug_log_path is None:
+    heap_debug_log_path = os.path.join(results_dir, 'heap_debug.log')
+
+general_debug_log_path = os.path.join(results_dir, 'debug.log')
+
+
 if args.soft_time_cap is not None:
   start_time = datetime.now()
   split_time_cap = [int(x.strip()) for x in args.soft_time_cap.split(':')]
@@ -165,12 +180,12 @@ def log_to_file(path, s):
     log_file.write(f'{format_log_message(s)}\n')
 
 
-def log(s, write_to_file=True):
+def log(s, write_to_file=True, path=general_debug_log_path):
   msg = format_log_message(s)
   print(msg)
 
   if write_to_file:
-    log_to_file(general_debug_log_path, msg)
+    log_to_file(path, msg)
 
 
 def timeit(method):
@@ -409,17 +424,6 @@ wandb.save(os.path.join(wandb.run.dir, '*.pth'))
 
 memory_save_folder = os.path.join(args.memory_save_folder, args.id)
 os.makedirs(memory_save_folder, exist_ok=True)
-
-if args.debug_heap:
-  process = psutil.Process()
-  # heap = hpy()
-  # heap.setref()
-
-  heap_debug_log_path = args.heap_debug_file
-  if heap_debug_log_path is None:
-    heap_debug_log_path = os.path.join(results_dir, 'heap_debug.log')
-
-general_debug_log_path = os.path.join(results_dir, 'debug.log')
 
 
 # Augmented representations and Environments
