@@ -217,7 +217,7 @@ def load_memory(use_bz2=True, use_native_pickle_serialization=False):
 
   if use_native_pickle_serialization:
     if use_bz2:
-      with bz2.open(zipped_full_path, 'rb') as zipped_pickle_file:
+      with bz2.open(final_full_path, 'rb') as zipped_pickle_file:
         return pickle.load(zipped_pickle_file)
 
     else:
