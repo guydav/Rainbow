@@ -269,17 +269,16 @@ def save_memory(memory, T_reached, use_native_pickle_serialization=False):
 
       pickle.dump(memory, zipped_pickle_file, protocol=pickle.HIGHEST_PROTOCOL)
 
-      process_mem = process.memory_info().rss
-      log_to_file(heap_debug_log_path,
-                  f'OS-level memory usage after save, before move: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
+    process_mem = process.memory_info().rss
+    log_to_file(heap_debug_log_path,
+                f'OS-level memory usage after save, before move: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
 
-      # Switch to copying and moving separately to mitigate the effect of instant shutdown while writing
-      shutil.move(zipped_full_path, final_full_path)
+    # Switch to copying and moving separately to mitigate the effect of instant shutdown while writing
+    shutil.move(zipped_full_path, final_full_path)
 
-      process_mem = process.memory_info().rss
-      log_to_file(heap_debug_log_path,
-                  f'OS-level memory usage after move: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
-
+    process_mem = process.memory_info().rss
+    log_to_file(heap_debug_log_path,
+                f'OS-level memory usage after move: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
 
   else:
     with open(pickle_full_path, 'wb') as pickle_file:
@@ -289,17 +288,17 @@ def save_memory(memory, T_reached, use_native_pickle_serialization=False):
 
       torch.save(memory, pickle_file, pickle_protocol=pickle.HIGHEST_PROTOCOL)
 
-      process_mem = process.memory_info().rss
-      log_to_file(heap_debug_log_path,
-                  f'OS-level memory usage after save, before bzip: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
+    process_mem = process.memory_info().rss
+    log_to_file(heap_debug_log_path,
+                f'OS-level memory usage after save, before bzip: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
 
-      subprocess_args = ['bzip2', '-f', '-z', pickle_full_path, '&&', 'mv', zipped_full_path, final_full_path]
-      save_process = subprocess.Popen(' '.join(subprocess_args), shell=True,
-                               stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    subprocess_args = ['bzip2', '-f', '-z', pickle_full_path, '&&', 'mv', zipped_full_path, final_full_path]
+    save_process = subprocess.Popen(' '.join(subprocess_args), shell=True,
+                             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-      process_mem = process.memory_info().rss
-      log_to_file(heap_debug_log_path,
-                  f'OS-level memory usage after starting bzip: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
+    process_mem = process.memory_info().rss
+    log_to_file(heap_debug_log_path,
+                f'OS-level memory usage after starting bzip: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
 
   with open(get_memory_file_path(replay_memory_T_reached), 'w') as memory_T_file:
     memory_T_file.write(str(T_reached))
@@ -492,19 +491,21 @@ else:
 
       popen = evaluate_and_save_memory(T, dqn)
 
-      log('About to call popen.commumicate')
-      out, err = popen.communicate()
-      
-      result = popen.returncode
-      log(f'Popen return code: {result}')
+      if popen is not None:
+        log('About to call popen.commumicate')
+        out, err = popen.communicate()
 
-      if out is not None and len(out) > 0:
-        log(f'Popen stdout: {out}')
-      if err is not None and len(err) > 0:
-        log(f'Popen stderr: {err}')
-        
-      popen.terminate()
-      popen = None
+        result = popen.returncode
+        log(f'Popen return code: {result}')
+
+        if out is not None and len(out) > 0:
+          log(f'Popen stdout: {out}')
+        if err is not None and len(err) > 0:
+          log(f'Popen stderr: {err}')
+
+        popen.terminate()
+        popen = None
+
       break
 
     if done:
