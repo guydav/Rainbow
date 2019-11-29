@@ -6,6 +6,7 @@ dependencies:
   - pytorch
   - tqdm
   - psutil
+  - pip
   - pip:
     - atari-py
     - opencv-python
