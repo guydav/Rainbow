@@ -471,7 +471,7 @@ else:
   for T in trange(T_start + 1, args.T_max + 1):
 
     if args.soft_time_cap is not None and end_time < datetime.now():
-      log(f'Hit some time cap, evaluating, saving, and exiting')
+      log(f'Hit soft time cap, evaluating, saving, and exiting')
 
       if popen is not None:
         log('Waiting for previous popen to end')
