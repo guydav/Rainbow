@@ -145,7 +145,6 @@ replay_memory_pickle_bz2_final = f'{args.seed}-replay-memory.pickle.bz2.final'
 replay_memory_T_reached = f'{args.seed}-T-reached.txt'
 
 
-
 if args.debug_heap:
   process = psutil.Process()
   # heap = hpy()
@@ -156,18 +155,6 @@ if args.debug_heap:
     heap_debug_log_path = os.path.join(results_dir, 'heap_debug.log')
 
 general_debug_log_path = os.path.join(results_dir, 'debug.log')
-
-
-if args.soft_time_cap is not None:
-  start_time = datetime.now()
-  split_time_cap = [int(x.strip()) for x in args.soft_time_cap.split(':')]
-  if len(split_time_cap) < 2 or len(split_time_cap) > 3:
-    raise ValueError(f'Expected time cap to have the format <DD>:HH:MM, got {args.soft_time_cap}')
-
-  if len(split_time_cap) == 2:
-    split_time_cap.insert(0, 0)
-
-  end_time = start_time + timedelta(days=split_time_cap[0], hours=split_time_cap[1], minutes=split_time_cap[2])
 
 
 # Simple ISO 8601 timestamped logger
@@ -186,6 +173,19 @@ def log(s, write_to_file=True, path=general_debug_log_path):
 
   if write_to_file:
     log_to_file(path, msg)
+
+
+if args.soft_time_cap is not None:
+  start_time = datetime.now()
+  split_time_cap = [int(x.strip()) for x in args.soft_time_cap.split(':')]
+  if len(split_time_cap) < 2 or len(split_time_cap) > 3:
+    raise ValueError(f'Expected time cap to have the format <DD>:HH:MM, got {args.soft_time_cap}')
+
+  if len(split_time_cap) == 2:
+    split_time_cap.insert(0, 0)
+
+  end_time = start_time + timedelta(days=split_time_cap[0], hours=split_time_cap[1], minutes=split_time_cap[2])
+  log(f'Received a soft cap of {args.soft_time_cap}, will terminate at {end_time}')
 
 
 def timeit(method):
