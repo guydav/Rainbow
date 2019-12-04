@@ -9,6 +9,7 @@ import pickle
 import shutil
 import time
 import subprocess
+import sys
 
 import atari_py
 import numpy as np
@@ -76,6 +77,7 @@ parser.add_argument('--wandb-omit-watch', action='store_true')
 parser.add_argument('--wandb-resume', action='store_true')
 DEFAULT_MEMORY_SAVE_FOLDER = os.path.join(SCRATCH_FOLDER, 'rainbow_memory')
 parser.add_argument('--memory-save-folder', default=DEFAULT_MEMORY_SAVE_FOLDER)
+parser.add_argument('--memory-save-interval', default=None, help='How often to save the memory, defaults to the evaluation interval')
 parser.add_argument('--use-native-pickle-serialization', action='store_true', help='Use native pickle saving rather than torch.save()')
 
 # Arguments for the augmented representations
@@ -137,6 +139,8 @@ else:
 
 memory_save_folder = os.path.join(args.memory_save_folder, args.id)
 os.makedirs(memory_save_folder, exist_ok=True)
+if args.memory_save_interval is None:
+  args.memory_save_interval = args.evaluation_interval
 
 replay_memory_pickle = f'{args.seed}-replay-memory.pickle'
 replay_memory_pickle_bz2 = f'{args.seed}-replay-memory.pickle.bz2'
@@ -282,10 +286,6 @@ def save_memory(memory, T_reached, use_native_pickle_serialization=False):
 
   else:
     with open(pickle_full_path, 'wb') as pickle_file:
-      process_mem = process.memory_info().rss
-      log_to_file(heap_debug_log_path,
-                  f'OS-level memory usage after file open: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
-
       torch.save(memory, pickle_file, pickle_protocol=pickle.HIGHEST_PROTOCOL)
 
     process_mem = process.memory_info().rss
@@ -310,18 +310,12 @@ def save_memory(memory, T_reached, use_native_pickle_serialization=False):
   return save_process
 
 
-def evaluate_and_save_memory(t, dqn):
+def evaluate_and_log_model(t, dqn):
   log(f'Starting to test at T = {t}')
   dqn.eval()  # Set DQN (online network) to evaluation mode
   avg_reward, avg_Q = test(args, t, dqn, val_mem, metrics, results_dir)  # Test
   log('T = ' + str(T) + ' / ' + str(args.T_max) + ' | Avg. reward: ' + str(avg_reward) + ' | Avg. Q: ' + str(avg_Q))
   dqn.train()  # Set DQN (online network) back to training mode
-
-  if args.debug_heap and t % args.heap_interval == 0:
-    log_to_file(heap_debug_log_path, f'After {T} steps:')
-    process_mem = process.memory_info().rss
-    log_to_file(heap_debug_log_path,
-                f'OS-level memory usage after testing: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
 
   log('Before model save')
   dqn.save(wandb.run.dir, f'{wandb_name}-{t}.pth')
@@ -329,16 +323,38 @@ def evaluate_and_save_memory(t, dqn):
     process_mem = process.memory_info().rss
     log_to_file(heap_debug_log_path,
                 f'OS-level memory usage after saving model: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
+  log('After model save')
+
+
+def wait_and_log_popen(popen_handle):
+  log('Waiting for previous popen to end')
+  log('About to call popen.commumicate')
+  out, err = popen_handle.communicate()
+  result = popen_handle.returncode
+  log(f'Popen return code: {result}')
+
+  if out is not None and len(out) > 0:
+    log(f'Popen stdout: {out}')
+  if err is not None and len(err) > 0:
+    log(f'Popen stderr: {err}')
+
+  popen_handle.terminate()
+  return None
+
+
+def save_and_log_memory(t, memory, popen_handle):
+  if popen_handle is not None:
+    log('WARNING: previous save has not finished. Waiting for it to finish...')
+    wait_and_log_popen(popen_handle)
 
   log('Before memory save')
-  save_process = save_memory(mem, t, use_native_pickle_serialization=args.use_native_pickle_serialization)
+  save_process = save_memory(memory, t, use_native_pickle_serialization=args.use_native_pickle_serialization)
   if args.debug_heap and t % args.heap_interval == 0:
     process_mem = process.memory_info().rss
     log_to_file(heap_debug_log_path,
                 f'OS-level memory usage after saving memory: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
 
-  log('After both saves')
-
+  log('After memory save')
   return save_process
 
 
@@ -385,6 +401,10 @@ if args.wandb_resume:
 
       if T_memory != T_checkpoint:
         print(f'Timestep mismatch: wandb has {T_checkpoint}, while memory file has {T_memory}. Going with {T_resume}...')
+
+      if T_resume >= args.T_max:
+        print(f'T_resume ({T_resume}) is greater than or equal to T_max ({args.T_max}), nothing to do here...')
+        sys.exit(0)
 
       # Now that we now that T_resume is, we can load from there.
       try:
@@ -474,38 +494,11 @@ else:
       log(f'Hit soft time cap, evaluating, saving, and exiting')
 
       if popen is not None:
-        log('Waiting for previous popen to end')
-        log('About to call popen.commumicate')
-        out, err = popen.communicate()
+        popen = wait_and_log_popen(popen)
 
-        result = popen.returncode
-        log(f'Popen return code: {result}')
-
-        if out is not None and len(out) > 0:
-          log(f'Popen stdout: {out}')
-        if err is not None and len(err) > 0:
-          log(f'Popen stderr: {err}')
-
-        popen.terminate()
-        popen = None
-
-      popen = evaluate_and_save_memory(T, dqn)
-
-      if popen is not None:
-        log('About to call popen.commumicate')
-        out, err = popen.communicate()
-
-        result = popen.returncode
-        log(f'Popen return code: {result}')
-
-        if out is not None and len(out) > 0:
-          log(f'Popen stdout: {out}')
-        if err is not None and len(err) > 0:
-          log(f'Popen stderr: {err}')
-
-        popen.terminate()
-        popen = None
-
+      evaluate_and_log_model(T, dqn)
+      popen = save_and_log_memory(T, mem, popen)
+      popen = wait_and_log_popen(popen)
       break
 
     if done:
@@ -535,7 +528,10 @@ else:
                     f'OS-level memory usage after training: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
 
       if T % args.evaluation_interval == 0:
-        popen = evaluate_and_save_memory(T, dqn)
+        evaluate_and_log_model(T, dqn)
+
+      if T % args.evaluation_interval == 0:
+        popen = save_and_log_memory(T, mem, popen)
 
       # Update target network
       if T % args.target_update == 0:
