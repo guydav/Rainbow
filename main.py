@@ -77,7 +77,7 @@ parser.add_argument('--wandb-omit-watch', action='store_true')
 parser.add_argument('--wandb-resume', action='store_true')
 DEFAULT_MEMORY_SAVE_FOLDER = os.path.join(SCRATCH_FOLDER, 'rainbow_memory')
 parser.add_argument('--memory-save-folder', default=DEFAULT_MEMORY_SAVE_FOLDER)
-parser.add_argument('--memory-save-interval', default=None, help='How often to save the memory, defaults to the evaluation interval')
+parser.add_argument('--memory-save-interval', type=int, default=None, help='How often to save the memory, defaults to the evaluation interval')
 parser.add_argument('--use-native-pickle-serialization', action='store_true', help='Use native pickle saving rather than torch.save()')
 
 # Arguments for the augmented representations
@@ -139,7 +139,7 @@ else:
 
 memory_save_folder = os.path.join(args.memory_save_folder, args.id)
 os.makedirs(memory_save_folder, exist_ok=True)
-if args.memory_save_interval is None:
+if args.memory_save_interval is None or args.memory_save_interval == 0:
   args.memory_save_interval = args.evaluation_interval
 
 replay_memory_pickle = f'{args.seed}-replay-memory.pickle'
