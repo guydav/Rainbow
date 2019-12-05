@@ -292,7 +292,7 @@ def save_memory(memory, T_reached, use_native_pickle_serialization=False):
     log_to_file(heap_debug_log_path,
                 f'OS-level memory usage after save, before bzip: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
 
-    subprocess_args = ['bzip2', '-f', '-z', pickle_full_path, '&&', 'mv', zipped_full_path, final_full_path]
+    subprocess_args = ['bzip2', '-f', '-z', '--fast', pickle_full_path, '&&', 'mv', zipped_full_path, final_full_path]
     save_process = subprocess.Popen(' '.join(subprocess_args), shell=True,
                              stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
@@ -530,7 +530,7 @@ else:
       if T % args.evaluation_interval == 0:
         evaluate_and_log_model(T, dqn)
 
-      if T % args.evaluation_interval == 0:
+      if T % args.memory_save_interval == 0:
         popen = save_and_log_memory(T, mem, popen)
 
       # Update target network
