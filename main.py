@@ -10,6 +10,7 @@ import shutil
 import time
 import subprocess
 import sys
+import string
 
 import atari_py
 import numpy as np
@@ -142,11 +143,32 @@ os.makedirs(memory_save_folder, exist_ok=True)
 if args.memory_save_interval is None or args.memory_save_interval == 0:
   args.memory_save_interval = args.evaluation_interval
 
-replay_memory_pickle = f'{args.seed}-replay-memory.pickle'
-replay_memory_pickle_bz2 = f'{args.seed}-replay-memory.pickle.bz2'
-replay_memory_pickle_bz2_temp = f'{args.seed}-replay-memory.pickle.bz2.temp'
-replay_memory_pickle_bz2_final = f'{args.seed}-replay-memory.pickle.bz2.final'
-replay_memory_T_reached = f'{args.seed}-T-reached.txt'
+REPLAY_MEMORY_PICKLE = 'replay_memory_pickle'
+REPLAY_MEMORY_BZIP = 'replay_memory_bzip'
+REPLAY_MEMORY_FINAL = 'replay_memory_final'
+REPLAY_MEMORY_T_REACHED = 'replay_memory_T_reached'
+
+REPLAY_MEMORY_PICKLE_TEMPLATES = {
+  REPLAY_MEMORY_PICKLE: f'{args.seed}-replay-memory{{rand}}.pickle',
+  REPLAY_MEMORY_BZIP: f'{args.seed}-replay-memory{{rand}}.pickle.bz2',
+  REPLAY_MEMORY_FINAL: f'{args.seed}-replay-memory.pickle.bz2.final',
+  REPLAY_MEMORY_T_REACHED: f'{args.seed}-T-reached.txt'
+}
+
+
+def get_memory_file_path(key, format_args=None, folder=memory_save_folder, template_dict=REPLAY_MEMORY_PICKLE_TEMPLATES):
+  if key not in template_dict:
+    raise ValueError(f'Received key {key}, expected one of {list(template_dict.keys())}')
+
+  if format_args is None:
+    format_args = {}
+
+  template = template_dict[key].format(format_args)
+  template_keys = [tup[1] for tup in string.Formatter().parse(template) if tup[1] is not None]
+  args = {key: '' for key in template_keys}
+  args.update(format_args)
+
+  return os.path.join(folder, template.format(args))
 
 
 if args.debug_heap:
@@ -160,6 +182,17 @@ if args.debug_heap:
 
 general_debug_log_path = os.path.join(results_dir, 'debug.log')
 
+
+def timeit(method):
+    def timed(*args, **kw):
+        start_time = time.time()
+        result = method(*args, **kw)
+        end_time = time.time()
+
+        print(f'{method.__name__} took {end_time - start_time:.2f} s')
+
+        return result
+    return timed
 
 # Simple ISO 8601 timestamped logger
 def format_log_message(s):
@@ -192,32 +225,13 @@ if args.soft_time_cap is not None:
   log(f'Received a soft cap of {args.soft_time_cap}, will terminate at {end_time}')
 
 
-def timeit(method):
-    def timed(*args, **kw):
-        start_time = time.time()
-        result = method(*args, **kw)
-        end_time = time.time()
-
-        print(f'{method.__name__} took {end_time - start_time:.2f} s')
-
-        return result
-    return timed
-
-
-def get_memory_file_path(name, folder=memory_save_folder):
-  return os.path.join(folder, name)
-
-
 @timeit
 def load_memory(use_bz2=True, use_native_pickle_serialization=False):
-  global replay_memory_pickle, replay_memory_pickle_bz2, replay_memory_pickle_bz2_final
-  global replay_memory_T_reached, heap_debug_log_path, process
+  global heap_debug_log_path, process
 
-  unzip_process = None
-
-  pickle_full_path = get_memory_file_path(replay_memory_pickle)
-  zipped_full_path = get_memory_file_path(replay_memory_pickle_bz2)
-  final_full_path = get_memory_file_path(replay_memory_pickle_bz2_final)
+  pickle_full_path = get_memory_file_path(REPLAY_MEMORY_PICKLE)
+  zipped_full_path = get_memory_file_path(REPLAY_MEMORY_BZIP)
+  final_full_path = get_memory_file_path(REPLAY_MEMORY_BZIP)
 
   if use_native_pickle_serialization:
     if use_bz2:
@@ -253,17 +267,18 @@ def load_memory(use_bz2=True, use_native_pickle_serialization=False):
 
     return memory
 
-
 @timeit
 def save_memory(memory, T_reached, use_native_pickle_serialization=False):
-  global replay_memory_pickle, replay_memory_pickle_bz2, replay_memory_pickle_bz2_final
-  global replay_memory_T_reached, heap_debug_log_path, process
+  global heap_debug_log_path, process
 
   save_process = None
 
-  pickle_full_path = get_memory_file_path(replay_memory_pickle)
-  zipped_full_path = get_memory_file_path(replay_memory_pickle_bz2)
-  final_full_path = get_memory_file_path(replay_memory_pickle_bz2_final)
+  save_rand = np.random.randint(0, 1000)
+
+  replay_memory_T_reached_path = get_memory_file_path(REPLAY_MEMORY_T_REACHED)
+  pickle_full_path = get_memory_file_path(REPLAY_MEMORY_PICKLE, dict(rand=save_rand))
+  zipped_full_path = get_memory_file_path(REPLAY_MEMORY_BZIP, dict(rand=save_rand))
+  final_full_path = get_memory_file_path(REPLAY_MEMORY_BZIP)
 
   if use_native_pickle_serialization:
     with bz2.open(zipped_full_path, 'wb') as zipped_pickle_file:
@@ -300,7 +315,7 @@ def save_memory(memory, T_reached, use_native_pickle_serialization=False):
     log_to_file(heap_debug_log_path,
                 f'OS-level memory usage after starting bzip: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
 
-  with open(get_memory_file_path(replay_memory_T_reached), 'w') as memory_T_file:
+  with open(replay_memory_T_reached_path, 'w') as memory_T_file:
     memory_T_file.write(str(T_reached))
 
   process_mem = process.memory_info().rss
@@ -390,10 +405,12 @@ if args.wandb_resume:
     if len(history) > 0:
       T_checkpoint = int(history['steps'].iat[-1])
 
-      if not os.path.exists(get_memory_file_path(replay_memory_T_reached)):
+      replay_memory_T_reached_path = get_memory_file_path(REPLAY_MEMORY_T_REACHED)
+
+      if not os.path.exists(replay_memory_T_reached_path):
         print('Couldn\'t find replay memory T reached file...')
 
-      with open(get_memory_file_path(replay_memory_T_reached), 'r') as T_file:
+      with open(replay_memory_T_reached_path, 'r') as T_file:
         T_memory = int(T_file.read())
 
       # Take the min to resume from the earlier of the two potential points
