@@ -231,7 +231,7 @@ def load_memory(use_bz2=True, use_native_pickle_serialization=False):
 
   pickle_full_path = get_memory_file_path(REPLAY_MEMORY_PICKLE)
   zipped_full_path = get_memory_file_path(REPLAY_MEMORY_BZIP)
-  final_full_path = get_memory_file_path(REPLAY_MEMORY_BZIP)
+  final_full_path = get_memory_file_path(REPLAY_MEMORY_FINAL)
 
   if use_native_pickle_serialization:
     if use_bz2:
