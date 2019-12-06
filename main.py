@@ -163,7 +163,7 @@ def get_memory_file_path(key, format_args=None, folder=memory_save_folder, templ
   if format_args is None:
     format_args = {}
 
-  template = template_dict[key].format(format_args)
+  template = template_dict[key]
   template_keys = [tup[1] for tup in string.Formatter().parse(template) if tup[1] is not None]
   args = {key: '' for key in template_keys}
   args.update(format_args)
