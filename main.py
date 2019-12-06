@@ -163,17 +163,12 @@ def get_memory_file_path(key, format_args=None, folder=memory_save_folder, templ
   if format_args is None:
     format_args = {}
 
-  print(format_args)
   template = template_dict[key]
-  print(template)
   template_keys = [tup[1] for tup in string.Formatter().parse(template) if tup[1] is not None]
-  print(template_keys)
   args = {key: '' for key in template_keys}
-  print(args)
   args.update(format_args)
-  print(args)
 
-  return os.path.join(folder, template.format(args))
+  return os.path.join(folder, template.format(**args))
 
 
 if args.debug_heap:
