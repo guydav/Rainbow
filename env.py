@@ -158,7 +158,7 @@ class TorchMaskerEnv(Env):
 
 
 def make_env(args):
-  args.state_depth = 1
+  args.state_depth = int(not args.omit_pixels)
 
   if args.add_masks:
     if args.maskers is None:
