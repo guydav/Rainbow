@@ -430,7 +430,8 @@ if args.wandb_resume:
       except (AttributeError, wandb.CommError) as e:
         print('Failed to download most recent checkpoint, will not resume')
 
-      loaded_replay_memory = load_memory(use_native_pickle_serialization=args.use_native_pickle_serialization)
+      if not args.evaluate:
+        loaded_replay_memory = load_memory(use_native_pickle_serialization=args.use_native_pickle_serialization)
 
   if original_run_id is None:
     print(f'Failed to find run to resume for seed {args.seed}, running from scratch')
