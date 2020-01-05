@@ -31,6 +31,7 @@ def test(args, T, dqn, val_mem, metrics, results_dir, evaluate=False):
     if args.save_evaluation_states:
       grayscale_states = []
       color_states = []
+      env_states = []
 
     debug_count = 0
 
@@ -45,6 +46,7 @@ def test(args, T, dqn, val_mem, metrics, results_dir, evaluate=False):
         if args.save_evaluation_states:
           grayscale_states.append(np.moveaxis(env.ale.getScreenGrayscale(), 2, 0))
           color_states.append(np.expand_dims(env.ale.getScreenRGB(), 0))
+          env_states.append(torch.cat(list(env.state_buffer), 0).cpu().numpy())
 
       action = dqn.act_e_greedy(state)  # Choose an action ε-greedily
       state, reward, done = env.step(action)  # Step
@@ -55,6 +57,7 @@ def test(args, T, dqn, val_mem, metrics, results_dir, evaluate=False):
       if args.save_evaluation_states:
         grayscale_states.append(np.moveaxis(env.ale.getScreenGrayscale(), 2, 0))
         color_states.append(np.expand_dims(env.ale.getScreenRGB(), 0))
+        env_states.append(torch.cat(list(env.state_buffer), 0).cpu().numpy())
 
       reward_sum += reward
       if args.render:
@@ -75,6 +78,10 @@ def test(args, T, dqn, val_mem, metrics, results_dir, evaluate=False):
           with open(os.path.join(args.evaluation_state_folder, f'eval-{args.id}-{args.seed}-{T}-{i}-color.pickle'), 'wb') \
             as color_file:
             pickle.dump(np.concatenate(color_states), color_file)
+
+          with open(os.path.join(args.evaluation_state_folder, f'eval-{args.id}-{args.seed}-{T}-{i}-env.pickle'), 'wb') \
+            as env_state_file:
+            pickle.dump(np.concatenate(env_states), env_state_file)
 
         break
   env.close()
