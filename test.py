@@ -81,6 +81,10 @@ def test(args, T, dqn, val_mem, metrics, results_dir, evaluate=False):
         color_states.append(np.expand_dims(env.ale.getScreenRGB(), 0))
         env_states.append(torch.cat(list(env.full_observation_buffer), 0).cpu().numpy())
 
+        if debug_count < 5:
+          print(env.state_buffer[0].shape, torch.cat(list(env.state_buffer), 0).shape,
+                env.full_observation_buffer[0].shape, env_states[-1].shape)
+
       reward_sum += reward
       if args.render:
         env.render()
