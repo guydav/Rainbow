@@ -87,7 +87,7 @@ def test(args, T, dqn, val_mem, metrics, results_dir, evaluate=False):
 
       if done:
         print(f'Episode {i}, steps {debug_count}, reward {reward_sum}')
-        print(len(env_states), env_states[0].shape, get_size(env_states[0]), get_size(env_states))
+        
         T_rewards.append(reward_sum)
         if args.save_evaluation_gifs:
           imageio.mimwrite(os.path.join(args.evaluation_gif_folder, f'eval-{args.id}-{args.seed}-{T}-{i}.gif'),
@@ -96,15 +96,15 @@ def test(args, T, dqn, val_mem, metrics, results_dir, evaluate=False):
         if args.save_evaluation_states:
           with open(os.path.join(args.evaluation_state_folder, f'eval-{args.id}-{args.seed}-{T}-{i}-gray.pickle'), 'wb') \
             as gray_file:
-            pickle.dump(np.concatenate(grayscale_states), gray_file)
+            pickle.dump(np.concatenate(grayscale_states), gray_file, protocol=pickle.HIGHEST_PROTOCOL)
 
           with open(os.path.join(args.evaluation_state_folder, f'eval-{args.id}-{args.seed}-{T}-{i}-color.pickle'), 'wb') \
             as color_file:
-            pickle.dump(np.concatenate(color_states), color_file)
+            pickle.dump(np.concatenate(color_states), color_file, protocol=pickle.HIGHEST_PROTOCOL)
 
           with open(os.path.join(args.evaluation_state_folder, f'eval-{args.id}-{args.seed}-{T}-{i}-env.pickle'), 'wb') \
             as env_state_file:
-            pickle.dump(np.concatenate(env_states), env_state_file)
+            pickle.dump(np.concatenate(env_states), env_state_file, protocol=pickle.HIGHEST_PROTOCOL)
 
         break
   env.close()
