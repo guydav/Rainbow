@@ -65,6 +65,7 @@ class Env():
   def step(self, action):
     # Repeat action 4 times, max pool over last 2 frames
     frame_buffer = torch.zeros(2, 84, 84, device=self.device)
+    grayscale_frame_buffer = torch.zeros((2, *FULL_FRAME_SHAPE), device=self.device)
     full_color_frame_buffer = torch.zeros((2, *FULL_FRAME_SHAPE, 3), device=self.device)
 
     reward, done = 0, False
@@ -72,17 +73,20 @@ class Env():
       reward += self.ale.act(self.actions.get(action))
       if t == 2:
         frame_buffer[0] = self._get_state()
+        grayscale_frame_buffer[0] = self._to_tensor(self.ale.getScreenGrayscale().squeeze())
         full_color_frame_buffer[0] = self._to_tensor(self.ale.getScreenRGB())
       elif t == 3:
         frame_buffer[1] = self._get_state()
+        grayscale_frame_buffer[1] = self._to_tensor(self.ale.getScreenGrayscale().squeeze())
         full_color_frame_buffer[1] = self._to_tensor(self.ale.getScreenRGB())
 
       done = self.ale.game_over()
       if done:
         break
-    observation, indices = frame_buffer.max(0)
+    observation = frame_buffer.max(0)[0]
     self.state_buffer.append(observation)
 
+    indices = grayscale_frame_buffer.max(0)[1]
     resized_indices = indices.unsqueeze(0).unsqueeze(3)
     resized_shape = list(resized_indices.shape)
     resized_shape[3] = 3
