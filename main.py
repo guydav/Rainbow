@@ -239,8 +239,8 @@ if args.wandb_resume:
   elif resume_checkpoint is None:
     print(f'Failed to find checkpoint to resume for seed {args.seed}, running from scratch')
 
-  elif loaded_replay_memory is None:
-    print('Failed to load replay memory for seed {args.seed}, running from scratch')
+  elif loaded_replay_memory is None and not args.evaluate:
+    print(f'Failed to load replay memory for seed {args.seed}, running from scratch')
 
   else:
     os.environ['WANDB_RESUME'] = 'must'
