@@ -24,6 +24,7 @@ class Env():
     self.life_termination = False  # Used to check if resetting only from loss of life
     self.window = args.history_length  # Number of frames to concatenate
     self.state_buffer = deque([], maxlen=args.history_length)
+    self.full_observation_buffer = deque([], maxlen=args.history_length)
     self.training = True  # Consistent with model training mode
     self.state_depth = args.state_depth
     self.omit_pixels = args.omit_pixels
@@ -40,7 +41,8 @@ class Env():
 
   def _reset_buffer(self):
     for _ in range(self.window):
-      self.state_buffer.append(torch.zeros(self.state_depth, *SMALL_FRAME_SHAPE, device=self.device))
+      self.state_buffer.append(torch.zeros((self.state_depth, *SMALL_FRAME_SHAPE), device=self.device))
+      self.full_observation_buffer.append(torch.zeros((*FULL_FRAME_SHAPE, 3), device=self.device))
 
   def _prepare_state(self, observation, full_color_state):
     observation = self._resize(observation.view(1, 1, *observation.shape)).div_(255)
@@ -74,10 +76,12 @@ class Env():
         if self.ale.game_over():
           self.ale.reset_game()
     # Process and return "initial" state
+    full_color_state = self._to_tensor(self.ale.getScreenRGB())
     state = self._prepare_state(self._to_tensor(self.ale.getScreenGrayscale().squeeze()),
-                                self._to_tensor(self.ale.getScreenRGB()))
+                                full_color_state)
 
     self.state_buffer.append(state)
+    self.full_observation_buffer.append(full_color_state)
     self.lives = self.ale.lives()
     return torch.cat(list(self.state_buffer), 0)
 
@@ -109,6 +113,7 @@ class Env():
 
     state = self._prepare_state(observation, full_color_observation)
     self.state_buffer.append(state)
+    self.full_observation_buffer.append(full_color_observation)
     # Detect loss of life as terminal in training mode
     if self.training:
       lives = self.ale.lives()

@@ -46,7 +46,7 @@ def test(args, T, dqn, val_mem, metrics, results_dir, evaluate=False):
         if args.save_evaluation_states:
           grayscale_states.append(np.moveaxis(env.ale.getScreenGrayscale(), 2, 0))
           color_states.append(np.expand_dims(env.ale.getScreenRGB(), 0))
-          env_states.append(torch.cat(list(env.state_buffer), 0).cpu().numpy())
+          env_states.append(torch.cat(list(env.full_observation_buffer), 0).cpu().numpy())
 
       action = dqn.act_e_greedy(state)  # Choose an action ε-greedily
       state, reward, done = env.step(action)  # Step
@@ -57,7 +57,7 @@ def test(args, T, dqn, val_mem, metrics, results_dir, evaluate=False):
       if args.save_evaluation_states:
         grayscale_states.append(np.moveaxis(env.ale.getScreenGrayscale(), 2, 0))
         color_states.append(np.expand_dims(env.ale.getScreenRGB(), 0))
-        env_states.append(torch.cat(list(env.state_buffer), 0).cpu().numpy())
+        env_states.append(torch.cat(list(env.full_observation_buffer), 0).cpu().numpy())
 
       reward_sum += reward
       if args.render:
