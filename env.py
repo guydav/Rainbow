@@ -80,7 +80,7 @@ class Env():
       done = self.ale.game_over()
       if done:
         break
-    observation, indices = frame_buffer.max(0)[0]
+    observation, indices = frame_buffer.max(0)
     self.state_buffer.append(observation)
 
     resized_indices = indices.unsqueeze(0).unsqueeze(3)
