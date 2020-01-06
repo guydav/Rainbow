@@ -219,14 +219,16 @@ if args.wandb_resume:
       except (AttributeError, wandb.CommError) as e:
         print('Failed to download most recent checkpoint, will not resume')
 
-      # temporary condition to handle the non-zipped, old pickle files
-      if os.path.exists(get_memory_file_path(replay_memory_pickle)):
-        loaded_replay_memory = load_memory(use_bz2=False)
-        save_memory(loaded_replay_memory, T_memory)
-        os.remove(get_memory_file_path(replay_memory_pickle))
+      # Only load memory when not evaluating
+      if not args.evaluate:
+        # temporary condition to handle the non-zipped, old pickle files
+        if os.path.exists(get_memory_file_path(replay_memory_pickle)):
+          loaded_replay_memory = load_memory(use_bz2=False)
+          save_memory(loaded_replay_memory, T_memory)
+          os.remove(get_memory_file_path(replay_memory_pickle))
 
-      else:
-        loaded_replay_memory = load_memory()
+        else:
+          loaded_replay_memory = load_memory()
 
   if original_run_id is None:
     print(f'Failed to find run to resume for seed {args.seed}, running from scratch')
