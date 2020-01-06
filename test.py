@@ -12,6 +12,28 @@ import pickle
 from profilehooks import profile
 
 from env import make_env
+import sys
+
+
+def get_size(obj, seen=None):
+    """Recursively finds size of objects"""
+    size = sys.getsizeof(obj)
+    if seen is None:
+        seen = set()
+    obj_id = id(obj)
+    if obj_id in seen:
+        return 0
+    # Important mark as seen *before* entering recursion to gracefully handle
+    # self-referential objects
+    seen.add(obj_id)
+    if isinstance(obj, dict):
+        size += sum([get_size(v, seen) for v in obj.values()])
+        size += sum([get_size(k, seen) for k in obj.keys()])
+    elif hasattr(obj, '__dict__'):
+        size += get_size(obj.__dict__, seen)
+    elif hasattr(obj, '__iter__') and not isinstance(obj, (str, bytes, bytearray)):
+        size += sum([get_size(i, seen) for i in obj])
+    return size
 
 
 # Test DQN
@@ -65,6 +87,7 @@ def test(args, T, dqn, val_mem, metrics, results_dir, evaluate=False):
 
       if done:
         print(f'Episode {i}, steps {debug_count}, reward {reward_sum}')
+        print(len(env_states), env_states[0].shape, get_size(env_states[0]), get_size(env_states))
         T_rewards.append(reward_sum)
         if args.save_evaluation_gifs:
           imageio.mimwrite(os.path.join(args.evaluation_gif_folder, f'eval-{args.id}-{args.seed}-{T}-{i}.gif'),
