@@ -75,12 +75,15 @@ class ReplayMemory():
     self.transitions = SegmentTree(capacity)  # Store transitions in a wrap-around cyclic buffer within a sum tree for querying priorities
     self.state_depth = args.state_depth
 
-    if self.state_depth > 1:
-      self.blank_trans = Transition(0, torch.zeros(self.state_depth, 84, 84, dtype=torch.uint8), None, 0, False)
-      self.concat_op = torch.cat
-    else:
-      self.blank_trans = Transition(0, torch.zeros(84, 84, dtype=torch.uint8), None, 0, False)
-      self.concat_op = torch.stack
+    # if self.state_depth > 1:
+    #   self.blank_trans = Transition(0, torch.zeros(self.state_depth, 84, 84, dtype=torch.uint8), None, 0, False)
+    #   self.concat_op = torch.cat
+    # else:
+    #   self.blank_trans = Transition(0, torch.zeros(84, 84, dtype=torch.uint8), None, 0, False)
+    #   self.concat_op = torch.stack
+
+    self.blank_trans = Transition(0, torch.zeros(self.state_depth, 84, 84, dtype=torch.uint8), None, 0, False)
+    self.concat_op = torch.cat
 
   # Adds state and action at time t, reward and terminal at time t + 1
   def append(self, state, action, reward, terminal):
