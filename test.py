@@ -63,7 +63,7 @@ def test(args, T, dqn, val_mem, metrics, results_dir, evaluate=False):
       if done:
         state, reward_sum, done = env.reset(), 0, False
         if args.save_evaluation_gifs:
-          gif_stack.append(state[3].cpu().numpy())
+          gif_stack.append(env.full_observation_buffer[-1].cpu().numpy())
 
         if args.save_evaluation_states:
           grayscale_states.append(np.moveaxis(env.ale.getScreenGrayscale(), 2, 0))
@@ -74,7 +74,7 @@ def test(args, T, dqn, val_mem, metrics, results_dir, evaluate=False):
       state, reward, done = env.step(action)  # Step
 
       if args.save_evaluation_gifs:
-        gif_stack.append(state[3].cpu().numpy())
+        gif_stack.append(env.full_observation_buffer[-1].cpu().numpy())
 
       if args.save_evaluation_states:
         grayscale_states.append(np.moveaxis(env.ale.getScreenGrayscale(), 2, 0))
