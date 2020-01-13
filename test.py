@@ -68,7 +68,7 @@ def test(args, T, dqn, val_mem, metrics, results_dir, evaluate=False):
         if args.save_evaluation_states:
           grayscale_states.append(np.moveaxis(env.ale.getScreenGrayscale(), 2, 0))
           color_states.append(np.expand_dims(env.ale.getScreenRGB(), 0))
-          env_states.extend([x.cpu().numpy() for x in env.full_observation_buffer])
+          env_states.extend([x.cpu().numpy().astype(np.uint8) for x in env.full_observation_buffer])
 
       action = dqn.act_e_greedy(state)  # Choose an action ε-greedily
       state, reward, done = env.step(action)  # Step
@@ -79,7 +79,7 @@ def test(args, T, dqn, val_mem, metrics, results_dir, evaluate=False):
       if args.save_evaluation_states:
         grayscale_states.append(np.moveaxis(env.ale.getScreenGrayscale(), 2, 0))
         color_states.append(np.expand_dims(env.ale.getScreenRGB(), 0))
-        env_states.append(env.full_observation_buffer[-1].cpu().numpy())
+        env_states.append(env.full_observation_buffer[-1].cpu().numpy().astype(np.uint8))
 
       reward_sum += reward
       if args.render:
