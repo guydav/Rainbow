@@ -104,7 +104,7 @@ def test(args, T, dqn, val_mem, metrics, results_dir, evaluate=False):
 
           with open(os.path.join(args.evaluation_state_folder, f'eval-{args.id}-{args.seed}-{T}-{i}-env.pickle'), 'wb') \
             as env_state_file:
-            pickle.dump(np.concatenate(env_states), env_state_file, protocol=pickle.HIGHEST_PROTOCOL)
+            pickle.dump(np.stack(env_states), env_state_file, protocol=pickle.HIGHEST_PROTOCOL)
 
         break
   env.close()
