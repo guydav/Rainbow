@@ -4,7 +4,6 @@ import random
 import atari_py
 import cv2
 import torch
-import numpy as np
 from masker import ALL_MASKERS, FULL_FRAME_SHAPE, SMALL_FRAME_SHAPE, ColorFilterMasker, TorchMasker
 
 

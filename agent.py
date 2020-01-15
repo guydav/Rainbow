@@ -47,10 +47,15 @@ class Agent():
   def reset_noise(self):
     self.online_net.reset_noise()
 
+  # Refactored from act(state), computes the expected value for each action
+  def action_expected_values(self, state):
+    with torch.no_grad():
+      return (self.online_net(state.unsqueeze(0)) * self.support).sum(2).squeeze()
+
   # Acts based on single state (no batch)
   def act(self, state):
     with torch.no_grad():
-      return (self.online_net(state.unsqueeze(0)) * self.support).sum(2).argmax(1).item()
+      return self.action_expected_values(state).argmax(0).item()
 
   # Acts with an ε-greedy policy (used for evaluation only)
   def act_e_greedy(self, state, epsilon=0.001):  # High ε can reduce evaluation scores drastically
