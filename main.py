@@ -499,7 +499,7 @@ if args.wandb_resume and T_resume is not None:
 if args.evaluate:
   dqn.eval()  # Set DQN (online network) to evaluation mode
 
-  if args.zero_out_mask_test:
+  if args.zero_out_masks_test:
     if args.add_masks is False:
       raise ValueError('Cannot test zeroing out masks without adding masks (args.zero_out_mask_test is True and args.add_masks is False)')
 
