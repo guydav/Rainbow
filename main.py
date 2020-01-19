@@ -508,7 +508,7 @@ if args.evaluate:
       indices = [[i for i in x] for x in indices]
 
     else:
-      indices = [[x] for x in range(len(env.masker_definitions))]
+      indices = [[x] for x in range(len(env.masker.masker_definitions))]
 
     columns = ['Zero Indices'] + [f'Reward #{i + 1}' for i in range(args.evaluation_episodes)] +\
               ['Reward Mean', 'Reward Std']
