@@ -514,7 +514,7 @@ if args.evaluate:
               ['Reward Mean', 'Reward Std']
     table = wandb.Table(columns=columns)
 
-    print('Evaluating the following index sets: {indices}')
+    print(f'Evaluating the following index sets: {indices}')
     for index_set in indices:
       print(f'Evaluating masking out the indices {index_set}')
       args.zero_mask_indices = index_set
