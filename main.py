@@ -86,6 +86,8 @@ parser.add_argument('--add-masks', action='store_true', help='Add masks for each
 parser.add_argument('--maskers', default=None, help='Select specific maskers to use')
 parser.add_argument('--use-numpy-masker', action='store_true', help='Use the previous, much slower numpy-based masker')
 parser.add_argument('--omit-pixels', action='store_true', help='Omit the raw pixels from the environment')
+parser.add_argument('--zero-out-masks-test', action='store-true', help='Test zeroing out particular indices')
+parser.add_argument('--zero-out-mask-indices', default=None, help='Which indices to zero out each time')
 
 # Arguments to give it a soft time cap that will help it not fail
 parser.add_argument('--soft-time-cap', help='Format: <DD>:HH:MM, stop after some soft cap such that the saving the memory does not fail')
@@ -496,8 +498,34 @@ if args.wandb_resume and T_resume is not None:
 
 if args.evaluate:
   dqn.eval()  # Set DQN (online network) to evaluation mode
-  avg_reward, avg_Q = test(args, T_start, dqn, val_mem, metrics, results_dir, evaluate=True)  # Test
-  print('Avg. reward: ' + str(avg_reward) + ' | Avg. Q: ' + str(avg_Q))
+
+  if args.zero_out_mask_test:
+    if args.add_masks is False:
+      raise ValueError('Cannot test zeroing out masks without adding masks (args.zero_out_mask_test is True and args.add_masks is False)')
+
+    if args.zero_out_mask_indices is not None:
+      indices = [x.strip() for x in args.zero_out_mask_indices.split(',')]
+      indices = [[i for i in x] for x in indices]
+
+    else:
+      indices = [[x] for x in range(len(env.masker_definitions))]
+
+    columns = ['Zero Indices'] + [f'Reward #{i + 1}' for i in range(args.evaluation_episodes)] +\
+              ['Reward Mean', 'Reward Std']
+    table = wandb.Table(columns=columns)
+
+    for index_set in indices:
+      args.zero_mask_indices = index_set
+      rewards, _ = test(args, T_start, dqn, val_mem, metrics, results_dir,
+                               evaluate=True, return_individual_values=True)  # Test
+
+      table.add_data(index_set, *rewards, np.mean(rewards), np.std(rewards))
+
+    wandb.log({'Zero Mask Evaluation Results': table})
+
+  else:
+    avg_reward, avg_Q = test(args, T_start, dqn, val_mem, metrics, results_dir, evaluate=True)  # Test
+    print('Avg. reward: ' + str(avg_reward) + ' | Avg. Q: ' + str(avg_Q))
 
 else:
   popen = None

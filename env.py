@@ -175,7 +175,10 @@ def make_env(args):
     if args.use_numpy_masker:
       return MaskerEnv(args, [ColorFilterMasker(masker_def) for masker_def in masker_defs])
     else:
-      return TorchMaskerEnv(args, TorchMasker(masker_defs, args.device))
+      if 'zero_mask_indices' not in args:
+        args.zero_mask_indices = None
+
+      return TorchMaskerEnv(args, TorchMasker(masker_defs, args.device, args.zero_mask_indices))
 
   else:
     return Env(args)

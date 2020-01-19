@@ -38,7 +38,7 @@ def get_size(obj, seen=None):
 
 # Test DQN
 # @profile(immediate=True)
-def test(args, T, dqn, val_mem, metrics, results_dir, evaluate=False):
+def test(args, T, dqn, val_mem, metrics, results_dir, evaluate=False, return_individual_values=False):
   env = make_env(args)
   env.eval()
   metrics['steps'].append(T)
@@ -136,8 +136,12 @@ def test(args, T, dqn, val_mem, metrics, results_dir, evaluate=False):
                    reward_mean=avg_reward, Q_value_mean=avg_Q,
                    reward_std=np.std(T_rewards), Q_value_std=np.std(T_Qs)))
 
+  if return_individual_values:
+    return T_rewards, T_Qs
+
   # Return average reward and Q-value
-  return avg_reward, avg_Q
+  else:
+    return avg_reward, avg_Q
 
 
 # Plots min, max and mean + standard deviation bars of a population over time
