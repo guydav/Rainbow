@@ -515,6 +515,7 @@ if args.evaluate:
     table = wandb.Table(columns=columns)
 
     for index_set in indices:
+      print(f'Evaluating masking out the indices {index_set}')
       args.zero_mask_indices = index_set
       rewards, _ = test(args, T_start, dqn, val_mem, metrics, results_dir,
                                evaluate=True, return_individual_values=True)  # Test
