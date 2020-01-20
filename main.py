@@ -510,18 +510,19 @@ if args.evaluate:
     else:
       indices = [[x] for x in range(len(env.masker.masker_definitions))]
 
-    columns = ['Zero Indices'] + [f'Reward #{i + 1}' for i in range(args.evaluation_episodes)] +\
-              ['Reward Mean', 'Reward Std']
+    columns = ['Zero Indices'] + [f'Reward #{i + 1}' for i in range(args.evaluation_episodes)] + \
+              [f'Steps #{i + 1}' for i in range(args.evaluation_episodes)] + ['Reward Mean', 'Reward Std'] + \
+              ['Step Mean', 'Step Std']
     table = wandb.Table(columns=columns)
 
     print(f'Evaluating the following index sets: {indices}')
     for index_set in indices:
       print(f'Evaluating masking out the indices {index_set}')
       args.zero_mask_indices = index_set
-      rewards, _ = test(args, T_start, dqn, val_mem, metrics, results_dir,
+      rewards, _, steps = test(args, T_start, dqn, val_mem, metrics, results_dir,
                                evaluate=True, return_individual_values=True)  # Test
 
-      table.add_data(index_set, *rewards, np.mean(rewards), np.std(rewards))
+      table.add_data(index_set, *rewards, *steps, np.mean(rewards), np.std(rewards), np.mean(steps), np.std(steps))
 
     wandb.log({'Zero Mask Evaluation Results': table})
 

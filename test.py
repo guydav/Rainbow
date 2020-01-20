@@ -42,7 +42,7 @@ def test(args, T, dqn, val_mem, metrics, results_dir, evaluate=False, return_ind
   env = make_env(args)
   env.eval()
   metrics['steps'].append(T)
-  T_rewards, T_Qs = [], []
+  T_rewards, T_Qs, T_steps = [], [], []
 
   # Test performance over several episodes
   done = True
@@ -55,10 +55,10 @@ def test(args, T, dqn, val_mem, metrics, results_dir, evaluate=False, return_ind
       color_states = []
       env_states = []
 
-    debug_count = 0
+    step_count = 0
 
     while True:
-      debug_count += 1
+      step_count += 1
 
       if done:
         state, reward_sum, done = env.reset(), 0, False
@@ -86,9 +86,10 @@ def test(args, T, dqn, val_mem, metrics, results_dir, evaluate=False, return_ind
         env.render()
 
       if done:
-        print(f'Episode {i}, steps {debug_count}, reward {reward_sum}')
+        print(f'Episode {i}, steps {step_count}, reward {reward_sum}')
 
         T_rewards.append(reward_sum)
+        T_steps.append(step_count)
         if args.save_evaluation_gifs:
           imageio.mimwrite(os.path.join(args.evaluation_gif_folder, f'eval-{args.id}-{args.seed}-{T}-{i}.gif'),
                            [(frame * 255).astype(np.uint8) for frame in gif_stack], fps=15)
@@ -137,7 +138,7 @@ def test(args, T, dqn, val_mem, metrics, results_dir, evaluate=False, return_ind
                    reward_std=np.std(T_rewards), Q_value_std=np.std(T_Qs)))
 
   if return_individual_values:
-    return T_rewards, T_Qs
+    return T_rewards, T_Qs, T_steps
 
   # Return average reward and Q-value
   else:
