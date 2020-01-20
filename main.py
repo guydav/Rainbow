@@ -406,7 +406,7 @@ if args.wandb_resume:
     # Verify there's actually a run to resume
     if len(history) > 0:
       checkpoint_index = -1
-      while history['steps'].iat[checkpoint_index] == float('NaN'):
+      while np.isnan(history['steps'].iat[checkpoint_index]):
         checkpoint_index -= 1
 
       T_checkpoint = int(history['steps'].iat[checkpoint_index])
