@@ -405,7 +405,11 @@ if args.wandb_resume:
 
     # Verify there's actually a run to resume
     if len(history) > 0:
-      T_checkpoint = int(history['steps'].iat[-1])
+      checkpoint_index = -1
+      while history['steps'].iat[checkpoint_index] == float('NaN'):
+        checkpoint_index -= 1
+
+      T_checkpoint = int(history['steps'].iat[checkpoint_index])
 
       replay_memory_T_reached_path = get_memory_file_path(REPLAY_MEMORY_T_REACHED)
 
