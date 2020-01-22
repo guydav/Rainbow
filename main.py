@@ -531,7 +531,7 @@ if args.evaluate:
       table.add_data(index_set, *rewards, *steps, np.mean(rewards), np.std(rewards), np.mean(steps), np.std(steps))
 
     if indices == DEFAULT_INDICES:
-      table_key = f'Zero Mask Evaluation Results for indices'
+      table_key = f'Zero Mask Evaluation Results'
     else:
       table_key = f'Zero Mask Evaluation Results for indices {indices}'
 
