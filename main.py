@@ -504,6 +504,8 @@ if args.evaluate:
   dqn.eval()  # Set DQN (online network) to evaluation mode
 
   if args.zero_out_masks_test:
+    DEFAULT_INDICES = [[]] + [[x] for x in range(len(env.masker.masker_definitions))]
+
     if args.add_masks is False:
       raise ValueError('Cannot test zeroing out masks without adding masks (args.zero_out_mask_test is True and args.add_masks is False)')
 
@@ -512,7 +514,7 @@ if args.evaluate:
       indices = [[i for i in x] for x in indices]
 
     else:
-      indices = [[x] for x in range(len(env.masker.masker_definitions))]
+      indices = DEFAULT_INDICES
 
     columns = ['Zero Indices'] + [f'Reward #{i + 1}' for i in range(args.evaluation_episodes)] + \
               [f'Steps #{i + 1}' for i in range(args.evaluation_episodes)] + ['Reward Mean', 'Reward Std'] + \
@@ -528,7 +530,12 @@ if args.evaluate:
 
       table.add_data(index_set, *rewards, *steps, np.mean(rewards), np.std(rewards), np.mean(steps), np.std(steps))
 
-    wandb.log({'Zero Mask Evaluation Results': table})
+    if indices == DEFAULT_INDICES:
+      table_key = f'Zero Mask Evaluation Results for indices'
+    else:
+      table_key = f'Zero Mask Evaluation Results for indices {indices}'
+
+    wandb.log({table_key: table})
 
   else:
     avg_reward, avg_Q = test(args, T_start, dqn, val_mem, metrics, results_dir, evaluate=True)  # Test
