@@ -47,6 +47,10 @@ class Agent():
   def reset_noise(self):
     self.online_net.reset_noise()
 
+  def expected_state_value(self, state):
+    with torch.no_grad():
+      return (self.online_net(state.unsqueeze(0), value_only=True) * self.support).sum(2).squeeze()
+
   # Refactored from act(state), computes the expected value for each action
   def expected_q_values(self, state):
     with torch.no_grad():
