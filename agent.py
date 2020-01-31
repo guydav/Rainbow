@@ -56,6 +56,13 @@ class Agent():
     with torch.no_grad():
       return (self.online_net(state.unsqueeze(0)) * self.support).sum(2).squeeze()
 
+  def q_value_mean_variance(self, state):
+    with torch.no_grad():
+      probs = self.online_net(state.unsqueeze(0))
+      mean = (probs * self.support).sum(2)
+      var = (probs * (self.support ** 2)).sum(2) - mean ** 2
+      return mean.squeeze(0), var.squeeze(0)
+
   # Acts based on single state (no batch)
   def act(self, state):
     with torch.no_grad():
