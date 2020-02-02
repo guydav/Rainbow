@@ -43,9 +43,10 @@ class Env():
       self.state_buffer.append(torch.zeros((self.state_depth, *SMALL_FRAME_SHAPE), device=self.device))
       self.full_observation_buffer.append(torch.zeros((*FULL_FRAME_SHAPE, 3), device=self.device))
 
-  def _prepare_state(self, observation, full_color_state):
+  def _prepare_state(self, observation, full_color_state, augmentation=None):
     observation = self._resize(observation.view(1, 1, *observation.shape)).div_(255)
-    augmentation = self._augment_state(full_color_state)
+    if augmentation is None:
+      augmentation = self._augment_state(full_color_state)
 
     if isinstance(augmentation, torch.Tensor):
       if self.omit_pixels:
