@@ -98,9 +98,9 @@ parser.add_argument('--heap-interval', default=1e4)
 parser.add_argument('--heap-debug-file', default=None)
 
 # Arguments to help with matching then number of parameters between models
-parser.add_argument('--conv1-num-filters', default=32, help='Number of filters in first convolutional layer. Default matches the cannonical Rainbow architecture.')
-parser.add_argument('--conv2-num-filters', default=64, help='Number of filters in second convolutional layer. Default matches the cannonical Rainbow architecture.')
-parser.add_argument('--conv3-num-filters', default=64, help='Number of filters in third convolutional layer. Default matches the cannonical Rainbow architecture.')
+parser.add_argument('--conv1-num-filters', type=int, default=32, help='Number of filters in first convolutional layer. Default matches the cannonical Rainbow architecture.')
+parser.add_argument('--conv2-num-filters', type=int, default=64, help='Number of filters in second convolutional layer. Default matches the cannonical Rainbow architecture.')
+parser.add_argument('--conv3-num-filters', type=int, default=64, help='Number of filters in third convolutional layer. Default matches the cannonical Rainbow architecture.')
 
 # Setup
 args = parser.parse_args()

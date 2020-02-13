@@ -2,8 +2,9 @@ import numpy as np
 import torch
 from collections import namedtuple
 
-MaskerDefinition = namedtuple('MaskerDefinition', ('filter_colors', 'row_range', 'col_range', 'range_whitelist'))
-MaskerDefinition.__new__.__defaults__ = (None, (None, None), (None, None), False)
+MaskerDefinition = namedtuple('MaskerDefinition', ('name', 'filter_colors', 'row_range',
+                                                   'col_range', 'range_whitelist'))
+MaskerDefinition.__new__.__defaults__ = ('', None, (None, None), (None, None), False)
 
 
 FULL_FRAME_SHAPE = (210, 160)
@@ -188,21 +189,21 @@ class TorchMasker:
 # igloo_masker = ColorFilterMasker(igloo_colors, igloo_full_frame_row_range,
 #                                  igloo_full_frame_col_range, range_whitelist=True)
 
-player_masker_def = MaskerDefinition(player_colors, igloo_full_frame_row_range,
+player_masker_def = MaskerDefinition('Agent', player_colors, igloo_full_frame_row_range,
                                      igloo_full_frame_col_range)
-unvisited_floe_masker_def = MaskerDefinition(unvisited_floe_colors, animal_full_frame_row_range,
+unvisited_floe_masker_def = MaskerDefinition('Unviisted floes', unvisited_floe_colors, animal_full_frame_row_range,
                                              (0, FULL_FRAME_SHAPE[1]), range_whitelist=True)
-visited_floe_masker_def = MaskerDefinition(visited_floe_colors, animal_full_frame_row_range,
+visited_floe_masker_def = MaskerDefinition('Visited floes', visited_floe_colors, animal_full_frame_row_range,
                                            (0, FULL_FRAME_SHAPE[1]), range_whitelist=True)
-land_masker_def = MaskerDefinition(land_colors, land_row_range,
+land_masker_def = MaskerDefinition('Land', land_colors, land_row_range,
                                    (0, FULL_FRAME_SHAPE[1]), range_whitelist=True)
-bad_animal_masker_def = MaskerDefinition(bad_animal_colors, animal_full_frame_row_range,
+bad_animal_masker_def = MaskerDefinition('Bad animals', bad_animal_colors, animal_full_frame_row_range,
                                          (0, FULL_FRAME_SHAPE[1]), range_whitelist=True)
-good_animal_masker_def = MaskerDefinition(good_animal_colors, animal_full_frame_row_range,
+good_animal_masker_def = MaskerDefinition('Good animals', good_animal_colors, animal_full_frame_row_range,
                                           (0, FULL_FRAME_SHAPE[1]), range_whitelist=True)
-bear_filter_def = MaskerDefinition(bear_colors, (0, animal_full_frame_row_min),
+bear_filter_def = MaskerDefinition('Bear', bear_colors, (0, animal_full_frame_row_min),
                                    (0, FULL_FRAME_SHAPE[1]), range_whitelist=True)
-igloo_masker_def = MaskerDefinition(igloo_colors, igloo_full_frame_row_range,
+igloo_masker_def = MaskerDefinition('Igloo', igloo_colors, igloo_full_frame_row_range,
                                     igloo_full_frame_col_range, range_whitelist=True)
 
 ALL_MASKERS = {
