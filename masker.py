@@ -84,7 +84,7 @@ class ColorFilterMasker:
 
 
 class TorchMasker:
-    def __init__(self, masker_definitions, device, zero_mask_indices=None):
+    def __init__(self, masker_definitions, device, zero_mask_indices=None, custom_mask_grouping=None):
         self.masker_definitions = sorted(list(masker_definitions), key=lambda md: len(md.filter_colors), reverse=True)
         self.device = device
 
@@ -111,6 +111,12 @@ class TorchMasker:
                 self.zero_mask[i, masker_def.row_range[0]:masker_def.row_range[1],
                                masker_def.col_range[0]:masker_def.col_range[1]] = 0
 
+        self.indices_per_group = None
+        if custom_mask_grouping is not None:
+            name_to_channel_index = {masker_def.name: i for i, masker_def in enumerate(self.masker_definitions)}
+            self.indices_per_group = [[name_to_channel_index[name] for name in group]
+                                      for group in custom_mask_grouping]
+
     def __call__(self, frame):
         all_mask_results = torch.eq(frame.view(1, *frame.shape), self.all_colors).all(dim=3)
         category_masks = torch.zeros(len(self.masker_definitions), *FULL_FRAME_SHAPE, device=self.device)
@@ -126,7 +132,16 @@ class TorchMasker:
 
         category_masks.mul_(self.zero_mask)
 
-        return category_masks    
+        if self.indices_per_group is not None:
+            output_mask = torch.zeros(len(self.indices_per_group), *FULL_FRAME_SHAPE, device=self.device)
+            for i, group_indices in enumerate(self.indices_per_group):
+                output_mask[i] = category_masks[group_indices].any(dim=0)
+
+            return output_mask
+
+        return category_masks
+
+
 # Below natively with uint8s -- it seems almost identical, perhaps a second slower over 20k steps
 """
 class TorchMasker:
@@ -189,30 +204,40 @@ class TorchMasker:
 # igloo_masker = ColorFilterMasker(igloo_colors, igloo_full_frame_row_range,
 #                                  igloo_full_frame_col_range, range_whitelist=True)
 
-player_masker_def = MaskerDefinition('Agent', player_colors, igloo_full_frame_row_range,
-                                     igloo_full_frame_col_range)
-unvisited_floe_masker_def = MaskerDefinition('Unviisted floes', unvisited_floe_colors, animal_full_frame_row_range,
+
+AGENT_KEY = 'agent'
+UNVISITED_FLOE_KEY = 'unvisited_floe'
+VISITED_FLOE_KEY = 'visited_floe'
+LAND_KEY = 'land'
+BAD_ANIMAL_KEY = 'bad_animal'
+GOOD_ANIMAL_KEY = 'good_animal'
+BEAR_KEY = 'bear'
+IGLOO_KEY = 'igloo'
+
+agent_masker_def = MaskerDefinition(AGENT_KEY, player_colors, igloo_full_frame_row_range,
+                                    igloo_full_frame_col_range)
+unvisited_floe_masker_def = MaskerDefinition(UNVISITED_FLOE_KEY, unvisited_floe_colors, animal_full_frame_row_range,
                                              (0, FULL_FRAME_SHAPE[1]), range_whitelist=True)
-visited_floe_masker_def = MaskerDefinition('Visited floes', visited_floe_colors, animal_full_frame_row_range,
+visited_floe_masker_def = MaskerDefinition(VISITED_FLOE_KEY, visited_floe_colors, animal_full_frame_row_range,
                                            (0, FULL_FRAME_SHAPE[1]), range_whitelist=True)
-land_masker_def = MaskerDefinition('Land', land_colors, land_row_range,
+land_masker_def = MaskerDefinition(LAND_KEY, land_colors, land_row_range,
                                    (0, FULL_FRAME_SHAPE[1]), range_whitelist=True)
-bad_animal_masker_def = MaskerDefinition('Bad animals', bad_animal_colors, animal_full_frame_row_range,
+bad_animal_masker_def = MaskerDefinition(BAD_ANIMAL_KEY, bad_animal_colors, animal_full_frame_row_range,
                                          (0, FULL_FRAME_SHAPE[1]), range_whitelist=True)
-good_animal_masker_def = MaskerDefinition('Good animals', good_animal_colors, animal_full_frame_row_range,
+good_animal_masker_def = MaskerDefinition(GOOD_ANIMAL_KEY, good_animal_colors, animal_full_frame_row_range,
                                           (0, FULL_FRAME_SHAPE[1]), range_whitelist=True)
-bear_filter_def = MaskerDefinition('Bear', bear_colors, (0, animal_full_frame_row_min),
+bear_filter_def = MaskerDefinition(BEAR_KEY, bear_colors, (0, animal_full_frame_row_min),
                                    (0, FULL_FRAME_SHAPE[1]), range_whitelist=True)
-igloo_masker_def = MaskerDefinition('Igloo', igloo_colors, igloo_full_frame_row_range,
+igloo_masker_def = MaskerDefinition(IGLOO_KEY, igloo_colors, igloo_full_frame_row_range,
                                     igloo_full_frame_col_range, range_whitelist=True)
 
 ALL_MASKERS = {
-    'player': player_masker_def,
-    'unvisited_floe': unvisited_floe_masker_def,
-    'visited_floe': visited_floe_masker_def,
-    'land': land_masker_def,
-    'bad_animal': bad_animal_masker_def,
-    'good_animal': good_animal_masker_def,
-    'bear': bear_filter_def,
-    'igloo': igloo_masker_def
+    AGENT_KEY: agent_masker_def,
+    UNVISITED_FLOE_KEY: unvisited_floe_masker_def,
+    VISITED_FLOE_KEY: visited_floe_masker_def,
+    LAND_KEY: land_masker_def,
+    BAD_ANIMAL_KEY: bad_animal_masker_def,
+    GOOD_ANIMAL_KEY: good_animal_masker_def,
+    BEAR_KEY: bear_filter_def,
+    IGLOO_KEY: igloo_masker_def
 }
