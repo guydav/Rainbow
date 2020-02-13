@@ -52,33 +52,27 @@ class DQN(nn.Module):
     self.atoms = args.atoms
     self.action_space = action_space
     if args.architecture == 'canonical':
-      self.convs = nn.Sequential(nn.Conv2d(args.history_length * args.state_depth, 32, 8, stride=4, padding=0), nn.ReLU(),
-                                 nn.Conv2d(32, 64, 4, stride=2, padding=0), nn.ReLU(),
-                                 nn.Conv2d(64, 64, 3, stride=1, padding=0), nn.ReLU())
+      self.convs = nn.Sequential(nn.Conv2d(args.history_length * args.state_depth, args.conv1_num_filters, 8, stride=4, padding=0), nn.ReLU(),
+                                 nn.Conv2d(args.conv1_num_filters, args.conv2_num_filters, 4, stride=2, padding=0), nn.ReLU(),
+                                 nn.Conv2d(args.conv2_num_filters, args.conv3_num_filters, 3, stride=1, padding=0), nn.ReLU())
       self.conv_output_size = 3136
     elif args.architecture == 'data-efficient':
-      self.convs = nn.Sequential(nn.Conv2d(args.history_length, 32, 5, stride=5, padding=0), nn.ReLU(),
-                                 nn.Conv2d(32, 64, 5, stride=5, padding=0), nn.ReLU())
+      self.convs = nn.Sequential(nn.Conv2d(args.history_length, args.conv1_num_filters, 5, stride=5, padding=0), nn.ReLU(),
+                                 nn.Conv2d(args.conv1_num_filters, args.conv2_num_filters, 5, stride=5, padding=0), nn.ReLU())
       self.conv_output_size = 576
     self.fc_h_v = NoisyLinear(self.conv_output_size, args.hidden_size, std_init=args.noisy_std)
     self.fc_h_a = NoisyLinear(self.conv_output_size, args.hidden_size, std_init=args.noisy_std)
     self.fc_z_v = NoisyLinear(args.hidden_size, self.atoms, std_init=args.noisy_std)
     self.fc_z_a = NoisyLinear(args.hidden_size, action_space * self.atoms, std_init=args.noisy_std)
 
-  def forward(self, x, log=False, value_only=False):
+  def forward(self, x, log=False):
     x = self.convs(x)
     x = x.view(-1, self.conv_output_size)
     v = self.fc_z_v(F.relu(self.fc_h_v(x)))  # Value stream
     a = self.fc_z_a(F.relu(self.fc_h_a(x)))  # Advantage stream
     v, a = v.view(-1, 1, self.atoms), a.view(-1, self.action_space, self.atoms)
-
-    if value_only:
-      if log:  # Use log softmax for numerical stability
-        return F.log_softmax(v, dim=2)  # Log probabilities with action over second dimension
-      else:
-        return F.softmax(v, dim=2)  # Probabilities with action over second dimension
-
     q = v + a - a.mean(1, keepdim=True)  # Combine streams
+
     if log:  # Use log softmax for numerical stability
       q = F.log_softmax(q, dim=2)  # Log probabilities with action over second dimension
     else:
