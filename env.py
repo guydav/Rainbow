@@ -179,7 +179,8 @@ def make_env(args):
       if 'zero_mask_indices' not in args:
         args.zero_mask_indices = None
 
-      return TorchMaskerEnv(args, TorchMasker(masker_defs, args.device, args.zero_mask_indices))
+      return TorchMaskerEnv(args, TorchMasker(masker_defs, args.device, args.zero_mask_indices,
+                                              args.custom_mask_grouping))
 
   else:
     return Env(args)

@@ -88,6 +88,8 @@ parser.add_argument('--use-numpy-masker', action='store_true', help='Use the pre
 parser.add_argument('--omit-pixels', action='store_true', help='Omit the raw pixels from the environment')
 parser.add_argument('--zero-out-masks-test', action='store_true', help='Test zeroing out particular indices')
 parser.add_argument('--zero-out-mask-indices', default=None, help='Which indices to zero out each time')
+parser.add_argument('--custom-mask-grouping', type=str, action='append', nargs='+',
+                    help='Create custom mask groupings. Provide the name of all masks in a particular group to each invocation of this argument.')
 
 # Arguments to give it a soft time cap that will help it not fail
 parser.add_argument('--soft-time-cap', help='Format: <DD>:HH:MM, stop after some soft cap such that the saving the memory does not fail')
