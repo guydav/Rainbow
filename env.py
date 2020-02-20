@@ -171,17 +171,16 @@ def make_env(args):
     else:
       masker_defs = [ALL_MASKERS[name.strip().lower()] for name in args.maskers.split(',')]
 
-    args.state_depth += len(masker_defs)
-
-    if args.use_numpy_masker:
-      return MaskerEnv(args, [ColorFilterMasker(masker_def) for masker_def in masker_defs])
+    if args.custom_mask_grouping is None or len(args.custom_mask_grouping) == 0:
+      args.state_depth += len(masker_defs)
     else:
-      if 'zero_mask_indices' not in args:
-        args.zero_mask_indices = None
+      args.state_depth += len(args.custom_mask_grouping)
 
-      return TorchMaskerEnv(args, TorchMasker(masker_defs, args.device, args.zero_mask_indices,
-                                              args.custom_mask_grouping))
+    if 'zero_mask_indices' not in args:
+      args.zero_mask_indices = None
 
+    return TorchMaskerEnv(args, TorchMasker(masker_defs, args.device, args.zero_mask_indices,
+                                            args.custom_mask_grouping))
   else:
     return Env(args)
 

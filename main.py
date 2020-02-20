@@ -84,7 +84,7 @@ parser.add_argument('--use-native-pickle-serialization', action='store_true', he
 # Arguments for the augmented representations
 parser.add_argument('--add-masks', action='store_true', help='Add masks for each semantic object types')
 parser.add_argument('--maskers', default=None, help='Select specific maskers to use')
-parser.add_argument('--use-numpy-masker', action='store_true', help='Use the previous, much slower numpy-based masker')
+# parser.add_argument('--use-numpy-masker', action='store_true', help='Use the previous, much slower numpy-based masker')
 parser.add_argument('--omit-pixels', action='store_true', help='Omit the raw pixels from the environment')
 parser.add_argument('--zero-out-masks-test', action='store_true', help='Test zeroing out particular indices')
 parser.add_argument('--zero-out-mask-indices', default=None, help='Which indices to zero out each time')
