@@ -96,7 +96,8 @@ class TorchMasker:
                                        for color in all_colors])
         self.category_lengths = [len(masker.filter_colors) for masker in self.masker_definitions]
         
-        self.zero_mask = torch.ones(len(self.masker_definitions), *FULL_FRAME_SHAPE, device=self.device)
+        self.zero_mask = torch.ones(len(self.masker_definitions), *FULL_FRAME_SHAPE,
+                                    device=self.device, dtype=torch.bool)
         for i, masker_def in enumerate(self.masker_definitions):
             if zero_mask_indices is not None and i in zero_mask_indices:
                 self.zero_mask[i, :, :] = 0
@@ -119,7 +120,8 @@ class TorchMasker:
 
     def __call__(self, frame):
         all_mask_results = torch.eq(frame.view(1, *frame.shape), self.all_colors).all(dim=3)
-        category_masks = torch.zeros(len(self.masker_definitions), *FULL_FRAME_SHAPE, device=self.device)
+        category_masks = torch.zeros(len(self.masker_definitions), *FULL_FRAME_SHAPE,
+                                     device=self.device, dtype=torch.bool)
 
         current_index = 0
         for i, length in enumerate(self.category_lengths):
@@ -137,9 +139,9 @@ class TorchMasker:
             for i, group_indices in enumerate(self.indices_per_group):
                 output_mask[i] = category_masks[group_indices].any(dim=0)
 
-            return output_mask
+            return output_mask.type(frame.dtype)
 
-        return category_masks
+        return category_masks.type(frame.dtype)
 
 
 # Below natively with uint8s -- it seems almost identical, perhaps a second slower over 20k steps
