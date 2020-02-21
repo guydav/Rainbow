@@ -181,6 +181,7 @@ def get_memory_file_path(key, format_args=None, folder=memory_save_folder, templ
 
 
 process = None
+heap_debug_log_path = None
 if args.debug_heap:
   process = psutil.Process()
   # heap = hpy()
@@ -210,8 +211,9 @@ def format_log_message(s):
 
 
 def log_to_file(path, s):
-  with open(path, 'a') as log_file:
-    log_file.write(f'{format_log_message(s)}\n')
+  if path is not None:
+    with open(path, 'a') as log_file:
+      log_file.write(f'{format_log_message(s)}\n')
 
 
 def log(s, write_to_file=True, path=general_debug_log_path):
@@ -615,15 +617,15 @@ else:
       if popen is not None:
         result = popen.poll()
         if result is not None:
-          log_to_file(heap_debug_log_path, f'Popen return code: {result}')
+          if args.debug_heap: log_to_file(heap_debug_log_path, f'Popen return code: {result}')
 
           try:
-            log_to_file(heap_debug_log_path, 'About to call popen.commumicate')
+            if args.debug_heap: log_to_file(heap_debug_log_path, 'About to call popen.commumicate')
             out, err = popen.communicate(timeout=10)
             if out is not None and len(out) > 0:
-              log_to_file(heap_debug_log_path, f'Popen stdout: {out}')
+              if args.debug_heap: log_to_file(heap_debug_log_path, f'Popen stdout: {out}')
             if err is not None and len(err) > 0:
-              log_to_file(heap_debug_log_path, f'Popen stderr: {err}')
+              if args.debug_heap: log_to_file(heap_debug_log_path, f'Popen stderr: {err}')
           except subprocess.TimeoutExpired:
             pass
 
