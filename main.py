@@ -180,6 +180,7 @@ def get_memory_file_path(key, format_args=None, folder=memory_save_folder, templ
   return os.path.join(folder, template.format(**args))
 
 
+process = None
 if args.debug_heap:
   process = psutil.Process()
   # heap = hpy()
@@ -278,7 +279,7 @@ def load_memory(use_bz2=True, use_native_pickle_serialization=False):
 
 @timeit
 def save_memory(memory, T_reached, use_native_pickle_serialization=False):
-  global heap_debug_log_path, process
+  global heap_debug_log_path, process, args
 
   save_process = None
 
@@ -291,45 +292,51 @@ def save_memory(memory, T_reached, use_native_pickle_serialization=False):
 
   if use_native_pickle_serialization:
     with bz2.open(zipped_full_path, 'wb') as zipped_pickle_file:
-      process_mem = process.memory_info().rss
-      log_to_file(heap_debug_log_path,
-                  f'OS-level memory usage after file open: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
+      if args.debug_heap:
+        process_mem = process.memory_info().rss
+        log_to_file(heap_debug_log_path,
+                    f'OS-level memory usage after file open: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
 
       pickle.dump(memory, zipped_pickle_file, protocol=pickle.HIGHEST_PROTOCOL)
 
-    process_mem = process.memory_info().rss
-    log_to_file(heap_debug_log_path,
-                f'OS-level memory usage after save, before move: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
+    if args.debug_heap:
+      process_mem = process.memory_info().rss
+      log_to_file(heap_debug_log_path,
+                  f'OS-level memory usage after save, before move: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
 
     # Switch to copying and moving separately to mitigate the effect of instant shutdown while writing
     shutil.move(zipped_full_path, final_full_path)
 
-    process_mem = process.memory_info().rss
-    log_to_file(heap_debug_log_path,
-                f'OS-level memory usage after move: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
+    if args.debug_heap:
+      process_mem = process.memory_info().rss
+      log_to_file(heap_debug_log_path,
+                  f'OS-level memory usage after move: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
 
   else:
     with open(pickle_full_path, 'wb') as pickle_file:
       torch.save(memory, pickle_file, pickle_protocol=pickle.HIGHEST_PROTOCOL)
 
-    process_mem = process.memory_info().rss
-    log_to_file(heap_debug_log_path,
-                f'OS-level memory usage after save, before bzip: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
+    if args.debug_heap:
+      process_mem = process.memory_info().rss
+      log_to_file(heap_debug_log_path,
+                  f'OS-level memory usage after save, before bzip: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
 
     subprocess_args = ['bzip2', '-f', '-z', '--fast', pickle_full_path, '&&', 'mv', zipped_full_path, final_full_path]
     save_process = subprocess.Popen(' '.join(subprocess_args), shell=True,
                              stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-    process_mem = process.memory_info().rss
-    log_to_file(heap_debug_log_path,
-                f'OS-level memory usage after starting bzip: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
+    if args.debug_heap:
+      process_mem = process.memory_info().rss
+      log_to_file(heap_debug_log_path,
+                  f'OS-level memory usage after starting bzip: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
 
   with open(replay_memory_T_reached_path, 'w') as memory_T_file:
     memory_T_file.write(str(T_reached))
 
-  process_mem = process.memory_info().rss
-  log_to_file(heap_debug_log_path,
-              f'OS-level memory usage after T-reached file: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
+  if args.debug_heap:
+    process_mem = process.memory_info().rss
+    log_to_file(heap_debug_log_path,
+                f'OS-level memory usage after T-reached file: {process_mem} bytes = {process_mem / 1024.0 / 1024:.3f} MB.')
 
   return save_process
 
