@@ -191,6 +191,7 @@ if args.debug_heap:
   if heap_debug_log_path is None:
     heap_debug_log_path = os.path.join(results_dir, 'heap_debug.log')
 
+
 general_debug_log_path = os.path.join(results_dir, 'debug.log')
 
 
@@ -513,6 +514,7 @@ for _ in range(args.evaluation_size):
 T_start = 0
 if args.wandb_resume and T_resume is not None:
   T_start = T_resume
+  loaded_replay_memory.device = mem.device
   mem = loaded_replay_memory
 
 
